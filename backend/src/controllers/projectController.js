@@ -1,9 +1,30 @@
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
+const User = require('../models/User');
 const { ROLES } = require('../utils/roles');
 const { PROJECT_STATUS_LIST } = require('../utils/projectStatus');
+const {
+  isProjectOwner,
+  isProjectMember,
+  canViewProject,
+  canManageProject,
+} = require('../utils/projectAccess');
 
-const USER_POPULATE_FIELDS = 'name email role profileImage';
+const USER_POPULATE_FIELDS = 'name email role status profileImage';
+
+/**
+ * Format a User object for member responses without sensitive fields
+ * @param {Object} user
+ * @returns {Object}
+ */
+const formatMember = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  status: user.status,
+  profileImage: user.profileImage,
+});
 
 /**
  * Validate start and deadline date combinations
@@ -222,12 +243,7 @@ const getProjectById = async (req, res) => {
       });
     }
 
-    // Access authorization check
-    const isOwner = project.owner._id.equals(req.user._id);
-    const isMember = project.members.some((m) => m._id.equals(req.user._id));
-    const isAdmin = req.user.role === ROLES.ADMIN;
-
-    if (!isAdmin && !isOwner && !isMember) {
+    if (!canViewProject(project, req.user)) {
       return res.status(403).json({
         success: false,
         message: 'You do not have permission to access this project',
@@ -275,10 +291,7 @@ const updateProject = async (req, res) => {
     }
 
     // Resource ownership authorization
-    const isAdmin = req.user.role === ROLES.ADMIN;
-    const isOwner = project.owner.equals(req.user._id);
-
-    if (!isAdmin && !isOwner) {
+    if (!canManageProject(project, req.user)) {
       return res.status(403).json({
         success: false,
         message: 'Only the project owner or an admin can update this project',
@@ -394,10 +407,7 @@ const deleteProject = async (req, res) => {
     }
 
     // Resource ownership authorization
-    const isAdmin = req.user.role === ROLES.ADMIN;
-    const isOwner = project.owner.equals(req.user._id);
-
-    if (!isAdmin && !isOwner) {
+    if (!canManageProject(project, req.user)) {
       return res.status(403).json({
         success: false,
         message: 'Only the project owner or an admin can delete this project',
@@ -418,10 +428,297 @@ const deleteProject = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get all members of a project
+ * @route   GET /api/projects/:projectId/members
+ * @access  Private (Admin, Project Owner, Project Members)
+ */
+const getProjectMembers = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID',
+      });
+    }
+
+    const project = await Project.findById(projectId).populate(
+      'members',
+      USER_POPULATE_FIELDS
+    );
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found',
+      });
+    }
+
+    if (!canViewProject(project, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to access this project',
+      });
+    }
+
+    const members = (project.members || []).map(formatMember);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        members,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+/**
+ * @desc    Add a member to a project
+ * @route   POST /api/projects/:projectId/members
+ * @access  Private (Admin & Project Owner only)
+ */
+const addProjectMember = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { userId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID',
+      });
+    }
+
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found',
+      });
+    }
+
+    if (!canManageProject(project, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the project owner or an admin can manage project members',
+      });
+    }
+
+    if (!userId || typeof userId !== 'string' || !userId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID',
+      });
+    }
+
+    const targetUser = await User.findById(userId.trim());
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (targetUser.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Inactive users cannot be added to projects',
+      });
+    }
+
+    if (isProjectMember(project, targetUser._id)) {
+      return res.status(409).json({
+        success: false,
+        message: 'User is already a member of this project',
+      });
+    }
+
+    await Project.findByIdAndUpdate(
+      projectId,
+      { $addToSet: { members: targetUser._id } },
+      { new: true }
+    );
+
+    const updatedProject = await Project.findById(projectId).populate(
+      'members',
+      USER_POPULATE_FIELDS
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Project member added successfully',
+      data: {
+        members: (updatedProject.members || []).map(formatMember),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+/**
+ * @desc    Remove a member from a project
+ * @route   DELETE /api/projects/:projectId/members/:userId
+ * @access  Private (Admin & Project Owner only)
+ */
+const removeProjectMember = async (req, res) => {
+  try {
+    const { projectId, userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID',
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID',
+      });
+    }
+
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found',
+      });
+    }
+
+    if (!canManageProject(project, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the project owner or an admin can manage project members',
+      });
+    }
+
+    // Project owner cannot be removed from project members
+    if (isProjectOwner(project, userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'The project owner cannot be removed from the project',
+      });
+    }
+
+    if (!isProjectMember(project, userId)) {
+      return res.status(404).json({
+        success: false,
+        message: 'User is not a member of this project',
+      });
+    }
+
+    await Project.findByIdAndUpdate(
+      projectId,
+      { $pull: { members: new mongoose.Types.ObjectId(userId) } },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Project member removed successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+/**
+ * @desc    Get eligible candidate users to add as project members
+ * @route   GET /api/projects/:projectId/member-candidates
+ * @access  Private (Admin & Project Owner only)
+ */
+const getMemberCandidates = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID',
+      });
+    }
+
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found',
+      });
+    }
+
+    if (!canManageProject(project, req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the project owner or an admin can view member candidates',
+      });
+    }
+
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+    const filter = {
+      status: 'active',
+      _id: { $nin: project.members },
+    };
+
+    if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim()) {
+      const escapedSearch = req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedSearch, 'i');
+      filter.$or = [{ name: searchRegex }, { email: searchRegex }];
+    }
+
+    const candidateUsers = await User.find(filter)
+      .sort({ name: 1 })
+      .limit(limit)
+      .select('name email role status profileImage');
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        users: candidateUsers.map(formatMember),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
 module.exports = {
   createProject,
   getProjects,
   getProjectById,
   updateProject,
   deleteProject,
+  getProjectMembers,
+  addProjectMember,
+  removeProjectMember,
+  getMemberCandidates,
 };
