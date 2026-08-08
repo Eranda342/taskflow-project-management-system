@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
+const Task = require('../models/Task');
 const User = require('../models/User');
 const { ROLES } = require('../utils/roles');
 const { PROJECT_STATUS_LIST } = require('../utils/projectStatus');
@@ -413,6 +414,9 @@ const deleteProject = async (req, res) => {
         message: 'Only the project owner or an admin can delete this project',
       });
     }
+
+    // Cascade delete all tasks belonging to this project
+    await Task.deleteMany({ project: projectId });
 
     await Project.findByIdAndDelete(projectId);
 
