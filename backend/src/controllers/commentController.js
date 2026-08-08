@@ -7,6 +7,7 @@ const { isProjectOwner, canViewProject } = require('../utils/projectAccess');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotifications } = require('../services/notificationService');
 const { emitToProject } = require('../socket/socketManager');
+const { isValidObjectId, parsePagination } = require('../utils/validation');
 
 // Field selection strings to prevent leaking sensitive fields (e.g., password)
 const USER_POPULATE_FIELDS = 'name email role profileImage';
@@ -150,9 +151,14 @@ const getTaskComments = async (req, res) => {
       });
     }
 
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, 20, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const [comments, totalComments] = await Promise.all([
       Comment.find({ task: taskId })

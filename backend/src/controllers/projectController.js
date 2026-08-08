@@ -19,6 +19,7 @@ const {
   addUserToProjectRoom,
   removeUserFromProjectRoom,
 } = require('../socket/socketManager');
+const { isValidObjectId, parsePagination, validateDates } = require('../utils/validation');
 
 const USER_POPULATE_FIELDS = 'name email role status profileImage';
 
@@ -35,36 +36,6 @@ const formatMember = (user) => ({
   status: user.status,
   profileImage: user.profileImage,
 });
-
-/**
- * Validate start and deadline date combinations
- * @param {string|Date} startDate
- * @param {string|Date} deadline
- * @returns {{ valid: boolean, message?: string }}
- */
-const validateDates = (startDate, deadline) => {
-  if (startDate !== undefined && startDate !== null) {
-    const start = new Date(startDate);
-    if (isNaN(start.getTime())) {
-      return { valid: false, message: 'Invalid start date format' };
-    }
-  }
-
-  if (deadline !== undefined && deadline !== null) {
-    const dead = new Date(deadline);
-    if (isNaN(dead.getTime())) {
-      return { valid: false, message: 'Invalid deadline date format' };
-    }
-  }
-
-  if (startDate && deadline) {
-    if (new Date(deadline) < new Date(startDate)) {
-      return { valid: false, message: 'Deadline cannot be earlier than start date' };
-    }
-  }
-
-  return { valid: true };
-};
 
 /**
  * @desc    Create a new project
@@ -128,8 +99,8 @@ const createProject = async (req, res) => {
       description: description.trim(),
       owner: req.user._id,
       members: [req.user._id],
-      startDate: startDate || null,
-      deadline: deadline || null,
+      startDate: startDate ? new Date(startDate) : null,
+      deadline: deadline ? new Date(deadline) : null,
       status: projectStatus,
     });
 
@@ -159,9 +130,14 @@ const createProject = async (req, res) => {
  */
 const getProjects = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, 10, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const query = {};
 
@@ -190,7 +166,13 @@ const getProjects = async (req, res) => {
     }
 
     // Status filter
-    if (req.query.status && PROJECT_STATUS_LIST.includes(req.query.status)) {
+    if (req.query.status !== undefined) {
+      if (!PROJECT_STATUS_LIST.includes(req.query.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid project status filter',
+        });
+      }
       query.status = req.query.status;
     }
 

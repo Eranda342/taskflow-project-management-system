@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
 const { ROLES, ROLE_LIST } = require('../utils/roles');
+const { isValidObjectId, parsePagination } = require('../utils/validation');
 
 /**
  * Format a User document for public API responses without sensitive fields
@@ -27,9 +28,14 @@ const formatUser = (user) => ({
  */
 const getUsers = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, 10, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const filter = {};
 
@@ -41,12 +47,24 @@ const getUsers = async (req, res) => {
     }
 
     // Filter by valid role
-    if (req.query.role && ROLE_LIST.includes(req.query.role)) {
+    if (req.query.role !== undefined) {
+      if (!ROLE_LIST.includes(req.query.role)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid role filter',
+        });
+      }
       filter.role = req.query.role;
     }
 
     // Filter by valid status
-    if (req.query.status && ['active', 'inactive'].includes(req.query.status)) {
+    if (req.query.status !== undefined) {
+      if (!['active', 'inactive'].includes(req.query.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid status filter',
+        });
+      }
       filter.status = req.query.status;
     }
 

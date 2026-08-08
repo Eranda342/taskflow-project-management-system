@@ -19,6 +19,7 @@ const { ROLES } = require('../utils/roles');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotification, createNotifications } = require('../services/notificationService');
 const { emitToProject } = require('../socket/socketManager');
+const { isValidObjectId, parsePagination } = require('../utils/validation');
 
 const USER_POPULATE_FIELDS = '_id name email role profileImage';
 const PROJECT_POPULATE_FIELDS = '_id name status deadline';
@@ -185,9 +186,14 @@ const getProjectTasks = async (req, res) => {
       });
     }
 
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, 10, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const filter = { project: project._id };
 
@@ -710,9 +716,14 @@ const updateTaskStatus = async (req, res) => {
  */
 const getMyTasks = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
-    const skip = (page - 1) * limit;
+    const pagination = parsePagination(req.query, 10, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const filter = { assignedTo: req.user._id };
 

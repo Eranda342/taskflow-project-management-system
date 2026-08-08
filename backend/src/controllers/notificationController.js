@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
+const { isValidObjectId, parsePagination, parseBooleanQuery } = require('../utils/validation');
 
 // Fields to populate for sender (omitting sensitive fields like password)
 const SENDER_POPULATE_FIELDS = 'name email role profileImage';
@@ -11,23 +12,27 @@ const SENDER_POPULATE_FIELDS = 'name email role profileImage';
  */
 const getNotifications = async (req, res) => {
   try {
-    const { read, page: queryPage, limit: queryLimit } = req.query;
+    const pagination = parsePagination(req.query, 20, 100);
+    if (!pagination.valid) {
+      return res.status(400).json({
+        success: false,
+        message: pagination.message,
+      });
+    }
+    const { page, limit, skip } = pagination;
 
     const filter = { recipient: req.user._id };
 
-    if (read !== undefined) {
-      if (read !== 'true' && read !== 'false') {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid read query parameter. Must be "true" or "false"',
-        });
-      }
-      filter.read = read === 'true';
+    const readCheck = parseBooleanQuery(req.query.read, 'read');
+    if (!readCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: readCheck.message,
+      });
     }
-
-    const page = Math.max(1, parseInt(queryPage, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(queryLimit, 10) || 20));
-    const skip = (page - 1) * limit;
+    if (readCheck.value !== undefined) {
+      filter.read = readCheck.value;
+    }
 
     const [notifications, totalNotifications] = await Promise.all([
       Notification.find(filter)
