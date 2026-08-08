@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const Project = require('../models/Project');
+const Task = require('../models/Task');
 const { ROLES, ROLE_LIST } = require('../utils/roles');
 
 /**
@@ -146,11 +148,7 @@ const updateUserRole = async (req, res) => {
       });
     }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { role },
-      { new: true, runValidators: true }
-    );
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -158,6 +156,20 @@ const updateUserRole = async (req, res) => {
         message: 'User not found',
       });
     }
+
+    // Protect against downgrading a project manager who owns projects
+    if (user.role === ROLES.PROJECT_MANAGER && role === ROLES.TEAM_MEMBER) {
+      const ownedProjectsCount = await Project.countDocuments({ owner: user._id });
+      if (ownedProjectsCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: "Transfer ownership of this user's projects before changing their role",
+        });
+      }
+    }
+
+    user.role = role;
+    await user.save();
 
     return res.status(200).json({
       success: true,
@@ -206,17 +218,44 @@ const updateUserStatus = async (req, res) => {
       });
     }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
       });
+    }
+
+    // Deactivation safety checks and operational cleanup
+    if (status === 'inactive') {
+      const ownedProjectsCount = await Project.countDocuments({ owner: user._id });
+      if (ownedProjectsCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: "Transfer ownership of this user's projects before deactivating the account",
+        });
+      }
+
+      // Safe deactivation
+      user.status = 'inactive';
+      await user.save();
+
+      // Operational cleanup: remove from all project memberships
+      await Project.updateMany(
+        { members: user._id },
+        { $pull: { members: user._id } }
+      );
+
+      // Operational cleanup: unassign all tasks assigned to user
+      await Task.updateMany(
+        { assignedTo: user._id },
+        { $set: { assignedTo: null } }
+      );
+    } else {
+      // Reactivation (active): does not restore old memberships/assignments
+      user.status = 'active';
+      await user.save();
     }
 
     return res.status(200).json({

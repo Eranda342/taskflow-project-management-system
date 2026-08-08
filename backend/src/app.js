@@ -7,6 +7,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api', taskRoutes);
 app.use('/api', commentRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api', dashboardRoutes);
+app.use('/api', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
