@@ -73,6 +73,7 @@ web_modules/
 .env.production
 .env.*
 !.env.example
+!.env.test.example
 
 # Build and dist outputs
 dist/
