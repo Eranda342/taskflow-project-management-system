@@ -6,6 +6,7 @@ const { ROLES } = require('../utils/roles');
 const { isProjectOwner, canViewProject } = require('../utils/projectAccess');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotifications } = require('../services/notificationService');
+const { emitToProject } = require('../socket/socketManager');
 
 // Field selection strings to prevent leaking sensitive fields (e.g., password)
 const USER_POPULATE_FIELDS = 'name email role profileImage';
@@ -85,6 +86,12 @@ const createComment = async (req, res) => {
     });
 
     const populatedComment = await Comment.findById(comment._id).populate('user', USER_POPULATE_FIELDS);
+
+    emitToProject(project._id, 'comment:new', {
+      projectId: project._id,
+      taskId: task._id,
+      comment: populatedComment,
+    });
 
     return res.status(201).json({
       success: true,
@@ -259,6 +266,12 @@ const updateComment = async (req, res) => {
 
     const populatedComment = await Comment.findById(comment._id).populate('user', USER_POPULATE_FIELDS);
 
+    emitToProject(project._id, 'comment:updated', {
+      projectId: project._id,
+      taskId: task._id,
+      comment: populatedComment,
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Comment updated successfully',
@@ -339,6 +352,12 @@ const deleteComment = async (req, res) => {
     }
 
     await Comment.findByIdAndDelete(commentId);
+
+    emitToProject(project._id, 'comment:deleted', {
+      projectId: project._id,
+      taskId: task._id,
+      commentId: comment._id,
+    });
 
     return res.status(200).json({
       success: true,

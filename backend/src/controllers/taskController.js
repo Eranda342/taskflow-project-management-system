@@ -18,6 +18,7 @@ const {
 const { ROLES } = require('../utils/roles');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotification, createNotifications } = require('../services/notificationService');
+const { emitToProject } = require('../socket/socketManager');
 
 const USER_POPULATE_FIELDS = '_id name email role profileImage';
 const PROJECT_POPULATE_FIELDS = '_id name status deadline';
@@ -130,6 +131,11 @@ const createTask = async (req, res) => {
       .populate('createdBy', USER_POPULATE_FIELDS)
       .populate('assignedTo', USER_POPULATE_FIELDS)
       .populate('project', PROJECT_POPULATE_FIELDS);
+
+    emitToProject(project._id, 'task:created', {
+      projectId: project._id,
+      task: populatedTask,
+    });
 
     return res.status(201).json({
       success: true,
@@ -430,6 +436,12 @@ const updateTask = async (req, res) => {
       .populate('assignedTo', USER_POPULATE_FIELDS)
       .populate('project', PROJECT_POPULATE_FIELDS);
 
+    emitToProject(project._id, 'task:updated', {
+      projectId: project._id,
+      task: updatedTask,
+      changeType: 'details',
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Task updated successfully',
@@ -499,6 +511,12 @@ const assignTask = async (req, res) => {
         .populate('assignedTo', USER_POPULATE_FIELDS)
         .populate('project', PROJECT_POPULATE_FIELDS);
 
+      emitToProject(project._id, 'task:updated', {
+        projectId: project._id,
+        task: populatedTask,
+        changeType: 'assignment',
+      });
+
       return res.status(200).json({
         success: true,
         message: 'Task unassigned successfully',
@@ -562,6 +580,12 @@ const assignTask = async (req, res) => {
       .populate('createdBy', USER_POPULATE_FIELDS)
       .populate('assignedTo', USER_POPULATE_FIELDS)
       .populate('project', PROJECT_POPULATE_FIELDS);
+
+    emitToProject(project._id, 'task:updated', {
+      projectId: project._id,
+      task: populatedTask,
+      changeType: 'assignment',
+    });
 
     return res.status(200).json({
       success: true,
@@ -655,6 +679,14 @@ const updateTaskStatus = async (req, res) => {
       .populate('createdBy', USER_POPULATE_FIELDS)
       .populate('assignedTo', USER_POPULATE_FIELDS)
       .populate('project', PROJECT_POPULATE_FIELDS);
+
+    if (statusChanged) {
+      emitToProject(project._id, 'task:updated', {
+        projectId: project._id,
+        task: populatedTask,
+        changeType: 'status',
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -806,6 +838,11 @@ const deleteTask = async (req, res) => {
     await Comment.deleteMany({ task: taskId });
 
     await Task.findByIdAndDelete(taskId);
+
+    emitToProject(project._id, 'task:deleted', {
+      projectId: project._id,
+      taskId: task._id,
+    });
 
     return res.status(200).json({
       success: true,

@@ -13,6 +13,12 @@ const {
 } = require('../utils/projectAccess');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotification } = require('../services/notificationService');
+const {
+  emitToProject,
+  closeProjectRoom,
+  addUserToProjectRoom,
+  removeUserFromProjectRoom,
+} = require('../socket/socketManager');
 
 const USER_POPULATE_FIELDS = 'name email role status profileImage';
 
@@ -370,6 +376,10 @@ const updateProject = async (req, res) => {
       .populate('owner', USER_POPULATE_FIELDS)
       .populate('members', USER_POPULATE_FIELDS);
 
+    emitToProject(project._id, 'project:updated', {
+      project: updatedProject,
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Project updated successfully',
@@ -426,6 +436,11 @@ const deleteProject = async (req, res) => {
     await Task.deleteMany({ project: projectId });
 
     await Project.findByIdAndDelete(projectId);
+
+    emitToProject(projectId, 'project:deleted', {
+      projectId,
+    });
+    closeProjectRoom(projectId);
 
     return res.status(200).json({
       success: true,
@@ -580,6 +595,12 @@ const addProjectMember = async (req, res) => {
       referenceId: project._id,
     });
 
+    emitToProject(projectId, 'member:added', {
+      projectId,
+      user: formatMember(targetUser),
+    });
+    addUserToProjectRoom(targetUser._id, projectId);
+
     return res.status(200).json({
       success: true,
       message: 'Project member added successfully',
@@ -674,6 +695,12 @@ const removeProjectMember = async (req, res) => {
       message: `You were removed from project: ${project.name}`,
       referenceId: project._id,
     });
+
+    emitToProject(projectId, 'member:removed', {
+      projectId,
+      userId,
+    });
+    removeUserFromProjectRoom(userId, projectId);
 
     return res.status(200).json({
       success: true,

@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
+const { emitToUser } = require('../socket/socketManager');
+
+const USER_SAFE_FIELDS = 'name email role profileImage';
 
 /**
  * Create a single notification for a recipient
@@ -26,7 +29,7 @@ const createNotification = async ({ recipient, sender = null, type, message, ref
     return null;
   }
 
-  return await Notification.create({
+  const createdNotification = await Notification.create({
     recipient: new mongoose.Types.ObjectId(recipientId),
     sender:
       senderId && mongoose.Types.ObjectId.isValid(senderId) ? new mongoose.Types.ObjectId(senderId) : null,
@@ -37,6 +40,18 @@ const createNotification = async ({ recipient, sender = null, type, message, ref
         ? new mongoose.Types.ObjectId(referenceId)
         : null,
   });
+
+  if (createdNotification) {
+    const populated = await Notification.findById(createdNotification._id).populate(
+      'sender',
+      USER_SAFE_FIELDS
+    );
+    emitToUser(recipientId, 'notification:new', {
+      notification: populated || createdNotification,
+    });
+  }
+
+  return createdNotification;
 };
 
 /**
@@ -82,7 +97,23 @@ const createNotifications = async ({ recipients, sender = null, type, message, r
     read: false,
   }));
 
-  return await Notification.insertMany(docs);
+  const insertedDocs = await Notification.insertMany(docs);
+
+  if (Array.isArray(insertedDocs) && insertedDocs.length > 0) {
+    const insertedIds = insertedDocs.map((d) => d._id);
+    const populatedDocs = await Notification.find({ _id: { $in: insertedIds } }).populate(
+      'sender',
+      USER_SAFE_FIELDS
+    );
+
+    for (const doc of populatedDocs) {
+      emitToUser(doc.recipient.toString(), 'notification:new', {
+        notification: doc,
+      });
+    }
+  }
+
+  return insertedDocs;
 };
 
 module.exports = {
