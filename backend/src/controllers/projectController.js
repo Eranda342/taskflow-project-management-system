@@ -633,6 +633,17 @@ const removeProjectMember = async (req, res) => {
       });
     }
 
+    // Unassign all tasks in this project assigned to the removed member
+    await Task.updateMany(
+      {
+        project: project._id,
+        assignedTo: new mongoose.Types.ObjectId(userId),
+      },
+      {
+        $set: { assignedTo: null },
+      }
+    );
+
     await Project.findByIdAndUpdate(
       projectId,
       { $pull: { members: new mongoose.Types.ObjectId(userId) } },
