@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
 const User = require('../models/User');
+const Comment = require('../models/Comment');
 const {
   TASK_STATUS,
   TASK_STATUS_LIST,
@@ -775,6 +776,9 @@ const deleteTask = async (req, res) => {
         message: 'Only the project owner or an admin can delete this task',
       });
     }
+
+    // Cascade delete all comments belonging to this task
+    await Comment.deleteMany({ task: taskId });
 
     await Task.findByIdAndDelete(taskId);
 

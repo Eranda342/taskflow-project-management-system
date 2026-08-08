@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
+const Comment = require('../models/Comment');
 const User = require('../models/User');
 const { ROLES } = require('../utils/roles');
 const { PROJECT_STATUS_LIST } = require('../utils/projectStatus');
@@ -415,7 +416,11 @@ const deleteProject = async (req, res) => {
       });
     }
 
-    // Cascade delete all tasks belonging to this project
+    // Cascade delete all tasks and their associated comments belonging to this project
+    const taskIds = await Task.find({ project: projectId }).distinct('_id');
+    if (taskIds.length > 0) {
+      await Comment.deleteMany({ task: { $in: taskIds } });
+    }
     await Task.deleteMany({ project: projectId });
 
     await Project.findByIdAndDelete(projectId);
