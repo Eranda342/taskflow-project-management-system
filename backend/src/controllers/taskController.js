@@ -16,6 +16,8 @@ const {
   canManageProject,
 } = require('../utils/projectAccess');
 const { ROLES } = require('../utils/roles');
+const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
+const { createNotification, createNotifications } = require('../services/notificationService');
 
 const USER_POPULATE_FIELDS = '_id name email role profileImage';
 const PROJECT_POPULATE_FIELDS = '_id name status deadline';
@@ -547,6 +549,15 @@ const assignTask = async (req, res) => {
     task.assignedTo = targetUser._id;
     await task.save();
 
+    // Create notification for the new assignee (avoiding self-notification)
+    await createNotification({
+      recipient: targetUser._id,
+      sender: req.user._id,
+      type: NOTIFICATION_TYPE.TASK_ASSIGNED,
+      message: `You were assigned to task: ${task.title}`,
+      referenceId: task._id,
+    });
+
     const populatedTask = await Task.findById(task._id)
       .populate('createdBy', USER_POPULATE_FIELDS)
       .populate('assignedTo', USER_POPULATE_FIELDS)
@@ -623,8 +634,22 @@ const updateTaskStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = task.status;
+    const statusChanged = previousStatus !== status;
+
     task.status = status;
     await task.save();
+
+    if (statusChanged) {
+      // Notify project owner and assigned user (excluding actor)
+      await createNotifications({
+        recipients: [project.owner, task.assignedTo],
+        sender: req.user._id,
+        type: NOTIFICATION_TYPE.TASK_STATUS_UPDATED,
+        message: `Task '${task.title}' status changed to '${status}'`,
+        referenceId: task._id,
+      });
+    }
 
     const populatedTask = await Task.findById(task._id)
       .populate('createdBy', USER_POPULATE_FIELDS)

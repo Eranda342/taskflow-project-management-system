@@ -11,6 +11,8 @@ const {
   canViewProject,
   canManageProject,
 } = require('../utils/projectAccess');
+const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
+const { createNotification } = require('../services/notificationService');
 
 const USER_POPULATE_FIELDS = 'name email role status profileImage';
 
@@ -569,6 +571,15 @@ const addProjectMember = async (req, res) => {
       USER_POPULATE_FIELDS
     );
 
+    // Notify the newly added member
+    await createNotification({
+      recipient: targetUser._id,
+      sender: req.user._id,
+      type: NOTIFICATION_TYPE.PROJECT_MEMBER_ADDED,
+      message: `You were added to project: ${project.name}`,
+      referenceId: project._id,
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Project member added successfully',
@@ -654,6 +665,15 @@ const removeProjectMember = async (req, res) => {
       { $pull: { members: new mongoose.Types.ObjectId(userId) } },
       { new: true }
     );
+
+    // Notify the removed member
+    await createNotification({
+      recipient: userId,
+      sender: req.user._id,
+      type: NOTIFICATION_TYPE.PROJECT_MEMBER_REMOVED,
+      message: `You were removed from project: ${project.name}`,
+      referenceId: project._id,
+    });
 
     return res.status(200).json({
       success: true,

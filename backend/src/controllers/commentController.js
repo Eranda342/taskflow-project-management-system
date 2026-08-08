@@ -4,6 +4,8 @@ const Task = require('../models/Task');
 const Project = require('../models/Project');
 const { ROLES } = require('../utils/roles');
 const { isProjectOwner, canViewProject } = require('../utils/projectAccess');
+const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
+const { createNotifications } = require('../services/notificationService');
 
 // Field selection strings to prevent leaking sensitive fields (e.g., password)
 const USER_POPULATE_FIELDS = 'name email role profileImage';
@@ -71,6 +73,15 @@ const createComment = async (req, res) => {
       task: task._id,
       user: req.user._id,
       message: message.trim(),
+    });
+
+    // Notify project owner and task assignee (excluding comment author)
+    await createNotifications({
+      recipients: [project.owner, task.assignedTo],
+      sender: req.user._id,
+      type: NOTIFICATION_TYPE.COMMENT_ADDED,
+      message: `New comment on task: ${task.title}`,
+      referenceId: comment._id,
     });
 
     const populatedComment = await Comment.findById(comment._id).populate('user', USER_POPULATE_FIELDS);
