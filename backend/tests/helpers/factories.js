@@ -3,8 +3,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../../src/models/User');
 const Project = require('../../src/models/Project');
 const Task = require('../../src/models/Task');
-const Comment = require('../../src/models/Comment');
-const Notification = require('../../src/models/Notification');
 
 /**
  * Generate a JWT token for a given user ID

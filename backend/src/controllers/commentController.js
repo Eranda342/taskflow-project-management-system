@@ -7,7 +7,7 @@ const { isProjectOwner, canViewProject } = require('../utils/projectAccess');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotifications } = require('../services/notificationService');
 const { emitToProject } = require('../socket/socketManager');
-const { isValidObjectId, parsePagination } = require('../utils/validation');
+const { parsePagination } = require('../utils/validation');
 
 // Field selection strings to prevent leaking sensitive fields (e.g., password)
 const USER_POPULATE_FIELDS = 'name email role profileImage';

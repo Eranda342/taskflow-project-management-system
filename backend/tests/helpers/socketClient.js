@@ -74,7 +74,6 @@ const joinProjectRoom = (socket, projectId, timeoutMs = DEFAULT_TIMEOUT_MS) =>
 const waitForEvent = (socket, eventName, timeoutMs = DEFAULT_TIMEOUT_MS) =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      // eslint-disable-next-line no-use-before-define
       socket.off(eventName, handler);
       reject(new Error(`waitForEvent("${eventName}") timed out after ${timeoutMs}ms`));
     }, timeoutMs);

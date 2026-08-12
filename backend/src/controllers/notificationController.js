@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
-const { isValidObjectId, parsePagination, parseBooleanQuery } = require('../utils/validation');
+const { parsePagination, parseBooleanQuery } = require('../utils/validation');
 
 // Fields to populate for sender (omitting sensitive fields like password)
 const SENDER_POPULATE_FIELDS = 'name email role profileImage';

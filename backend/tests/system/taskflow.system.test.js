@@ -38,7 +38,6 @@ const {
 // Server state shared across test blocks
 // ──────────────────────────────────────────────────────────────────────────────
 let baseUrl;
-let app; // express app used by supertest
 let admin, pm, tm;
 let adminToken, pmToken, tmToken;
 let pmSocket, tmSocket;
@@ -49,10 +48,8 @@ let projectId, taskId;
 // ──────────────────────────────────────────────────────────────────────────────
 beforeAll(async () => {
   await connectTestDb();
-  const { baseUrl: url, server } = await startSystemServer();
+  const { baseUrl: url } = await startSystemServer();
   baseUrl = url;
-  // Provide the app to supertest via the server address (not fixed port)
-  app = baseUrl; // supertest accepts a URL string as the agent
 }, 20000);
 
 afterAll(async () => {

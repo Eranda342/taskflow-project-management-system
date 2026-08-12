@@ -89,7 +89,7 @@ describe('Project Integration Tests (/api/projects/*)', () => {
       const tm = await createTestUser({ role: 'team_member' });
 
       const projectA = await createTestProject({ name: 'Project A', owner: pmA._id, members: [pmA._id, tm._id] });
-      const projectB = await createTestProject({ name: 'Project B', owner: pmB._id, members: [pmB._id] });
+      await createTestProject({ name: 'Project B', owner: pmB._id, members: [pmB._id] });
 
       // Admin sees both
       const adminRes = await request(app)

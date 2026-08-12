@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
 const { ROLES, ROLE_LIST } = require('../utils/roles');
-const { isValidObjectId, parsePagination } = require('../utils/validation');
+const { parsePagination } = require('../utils/validation');
 
 /**
  * Format a User document for public API responses without sensitive fields

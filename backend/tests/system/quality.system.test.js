@@ -400,7 +400,7 @@ describe('Quality 2 — Direct Persistence-Before-Realtime (DB query inside even
     const capturePromise = captureEventWithDbQuery(
       qTmSocket,
       'notification:new',
-      async (payload) => {
+      async (_payload) => {
         // Runs INSIDE the socket.io event callback
         // Query by recipient + type + referenceId (the notification referenceId = taskId)
         return Notification.findOne({

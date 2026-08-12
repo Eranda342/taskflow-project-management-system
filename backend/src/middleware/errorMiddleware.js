@@ -1,7 +1,7 @@
 /**
  * Centralized 404 Not Found Middleware
  */
-const notFoundHandler = (req, res, next) => {
+const notFoundHandler = (_req, res, _next) => {
   return res.status(404).json({
     success: false,
     message: 'Route not found',
@@ -11,7 +11,7 @@ const notFoundHandler = (req, res, next) => {
 /**
  * Centralized Global Error Handler Middleware
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, _req, res, _next) => {
   let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Internal server error';
 

@@ -19,7 +19,7 @@ const { ROLES } = require('../utils/roles');
 const { NOTIFICATION_TYPE } = require('../utils/notificationConstants');
 const { createNotification, createNotifications } = require('../services/notificationService');
 const { emitToProject } = require('../socket/socketManager');
-const { isValidObjectId, parsePagination } = require('../utils/validation');
+const { parsePagination } = require('../utils/validation');
 
 const USER_POPULATE_FIELDS = '_id name email role profileImage';
 const PROJECT_POPULATE_FIELDS = '_id name status deadline';

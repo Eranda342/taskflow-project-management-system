@@ -9,7 +9,11 @@
     "test": "jest --runInBand",
     "test:unit": "jest tests/unit --runInBand",
     "test:integration": "jest tests/integration --runInBand",
-    "test:system": "jest tests/system --runInBand"
+    "test:system": "jest tests/system --runInBand",
+    "test:coverage": "jest --coverage --runInBand",
+    "lint": "eslint src tests --max-warnings=0",
+    "lint:src": "eslint src --max-warnings=0",
+    "lint:tests": "eslint tests --max-warnings=0"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +31,9 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
     "jest": "^30.4.2",
     "nodemon": "^3.1.14",
     "socket.io-client": "^4.8.3",

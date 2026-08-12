@@ -19,7 +19,7 @@ const {
   addUserToProjectRoom,
   removeUserFromProjectRoom,
 } = require('../socket/socketManager');
-const { isValidObjectId, parsePagination, validateDates } = require('../utils/validation');
+const { parsePagination, validateDates } = require('../utils/validation');
 
 const USER_POPULATE_FIELDS = 'name email role status profileImage';
 

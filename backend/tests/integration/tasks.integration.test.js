@@ -1,6 +1,5 @@
 const request = require('supertest');
 const app = require('../../src/app');
-const Task = require('../../src/models/Task');
 const { connectTestDb, cleanTestDb, disconnectTestDb } = require('../helpers/testDb');
 const { createTestUser, createTestProject, createTestTask, getAuthToken } = require('../helpers/factories');
 
