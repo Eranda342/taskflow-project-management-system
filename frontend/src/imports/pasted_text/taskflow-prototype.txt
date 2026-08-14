@@ -1,0 +1,1376 @@
+Create a COMPLETE, FULLY INTERACTIVE web application prototype for a project management system called "TaskFlow".
+
+IMPORTANT:
+Do NOT create only a landing page.
+Do NOT create only a dashboard.
+Do NOT create a collection of disconnected screens.
+
+Create the ENTIRE authenticated web application, including EVERY page, route, modal, dropdown, form, table, interaction, navigation flow, loading state, error state, empty state and responsive layout.
+
+The final Figma prototype must behave like a real application:
+- Navigation must work
+- Sidebar links must work
+- Buttons must open the correct pages/modals
+- Tabs must switch content
+- Dropdowns must open
+- Filters must work visually
+- Search interactions must work visually
+- Forms must have realistic interaction states
+- Modals must open and close
+- Confirmation dialogs must work
+- Notifications must open
+- User menus must work
+- Project pages must navigate correctly
+- Task pages must navigate correctly
+- Comments must have interactive states
+- Admin pages must be navigable
+- Back buttons must work
+- Breadcrumbs must work
+- Authentication flows must work as prototypes
+- Role-specific navigation must work
+
+Build this as a COMPLETE SaaS product prototype that can later be implemented as a React frontend.
+
+==================================================
+PRODUCT
+==================================================
+
+Product name:
+
+TASKFLOW
+
+Description:
+
+TaskFlow is a collaborative project management and task tracking platform.
+
+It allows organizations and teams to:
+
+- Create and manage projects
+- Add project members
+- Create and assign tasks
+- Track task progress
+- Manage task priorities
+- Comment on tasks
+- Receive notifications
+- Collaborate in realtime
+- Monitor project progress
+- Manage users
+- View platform analytics
+
+The backend/API already exists.
+
+The frontend design MUST therefore be structured like a real React application consuming an existing REST API and Socket.IO realtime API.
+
+==================================================
+USER ROLES
+==================================================
+
+There are exactly three primary roles:
+
+1. ADMIN
+2. PROJECT MANAGER
+3. TEAM MEMBER
+
+Create role-specific experiences.
+
+ADMIN:
+- Platform-wide access
+- User management
+- Project management
+- Analytics
+- Administrative operations
+
+PROJECT MANAGER:
+- Dashboard
+- Projects
+- Project members
+- Tasks
+- Comments
+- Notifications
+- Project management
+
+TEAM MEMBER:
+- Dashboard
+- My projects
+- My tasks
+- Task details
+- Comments
+- Notifications
+
+Never show Admin-only navigation to Team Members or Project Managers.
+
+==================================================
+DESIGN SYSTEM
+==================================================
+
+Create a reusable design system FIRST.
+
+Use:
+
+Primary:
+#2563EB
+
+Primary Hover:
+#1D4ED8
+
+Primary Light:
+#DBEAFE
+
+Dark:
+#0F172A
+
+Secondary Dark:
+#334155
+
+Background:
+#F8FAFC
+
+Surface:
+#FFFFFF
+
+Secondary Surface:
+#F1F5F9
+
+Border:
+#E2E8F0
+
+Strong Border:
+#CBD5E1
+
+Primary Text:
+#0F172A
+
+Secondary Text:
+#475569
+
+Muted Text:
+#64748B
+
+Disabled:
+#94A3B8
+
+Success:
+#16A34A
+
+Success Background:
+#DCFCE7
+
+Warning:
+#D97706
+
+Warning Background:
+#FEF3C7
+
+Error:
+#DC2626
+
+Error Background:
+#FEE2E2
+
+Info:
+#0284C7
+
+Info Background:
+#E0F2FE
+
+Task status:
+
+TO DO:
+#64748B
+
+IN PROGRESS:
+#2563EB
+
+REVIEW:
+#D97706
+
+COMPLETED:
+#16A34A
+
+Priority:
+
+LOW:
+#64748B
+
+MEDIUM:
+#2563EB
+
+HIGH:
+#D97706
+
+URGENT:
+#DC2626
+
+Typography:
+Inter
+
+Use an 8px spacing system.
+
+Use Auto Layout extensively.
+
+Use reusable Figma components and variants.
+
+==================================================
+APPLICATION STRUCTURE
+==================================================
+
+Create these Figma pages:
+
+01 — Design System
+
+02 — Authentication
+
+03 — Shared Application
+
+04 — Project Manager
+
+05 — Team Member
+
+06 — Admin
+
+07 — Projects
+
+08 — Tasks
+
+09 — Notifications
+
+10 — Profile & Settings
+
+11 — Responsive Mobile
+
+12 — Interactive Prototype
+
+==================================================
+AUTHENTICATION
+==================================================
+
+Create complete authentication flow.
+
+PAGE:
+
+/login
+
+Design:
+
+- TaskFlow logo
+- Email
+- Password
+- Show password
+- Remember me
+- Login
+- Forgot password
+- Register link
+
+States:
+
+- Default
+- Loading
+- Invalid credentials
+- Validation error
+- Account inactive
+- Server error
+
+Prototype:
+
+Login button → Dashboard
+
+Create:
+
+/register
+
+Fields:
+
+- Full name
+- Email
+- Password
+- Confirm password
+
+States:
+
+- Default
+- Password validation
+- Invalid email
+- Password mismatch
+- Loading
+- Registration success
+- Registration failure
+
+Register → Login
+
+==================================================
+AUTHENTICATED APPLICATION SHELL
+==================================================
+
+Create the main application layout.
+
+Desktop:
+
+LEFT SIDEBAR
+
+TaskFlow logo
+
+Navigation:
+
+Dashboard
+Projects
+My Tasks
+Notifications
+
+Admin-only:
+
+Users
+Analytics
+
+Bottom:
+
+Settings
+Profile
+Logout
+
+TOP HEADER:
+
+Search
+Notifications
+User avatar
+User name
+Role
+Profile dropdown
+
+Create:
+
+- Expanded sidebar
+- Collapsed sidebar
+- Mobile drawer
+
+Every navigation item must be clickable.
+
+==================================================
+PROJECT MANAGER DASHBOARD
+==================================================
+
+Route:
+
+/dashboard
+
+Create complete dashboard.
+
+Header:
+
+Good morning, [User]
+
+Summary cards:
+
+Total Projects
+Active Projects
+Total Tasks
+My Tasks
+Overdue Tasks
+Unread Notifications
+
+Create clickable cards.
+
+Recent Projects section.
+
+Columns:
+
+Project
+Status
+Owner
+Members
+Deadline
+Progress
+
+Click project → Project Details.
+
+Recent Tasks.
+
+Columns:
+
+Task
+Project
+Assignee
+Priority
+Status
+Due Date
+
+Click task → Task Details.
+
+Upcoming deadlines.
+
+Charts:
+
+Task Status
+Project Status
+Task Priority
+
+Quick actions:
+
+Create Project
+Create Task
+
+Create working prototype interactions.
+
+==================================================
+TEAM MEMBER DASHBOARD
+==================================================
+
+Route:
+
+/dashboard
+
+Create different dashboard for Team Member.
+
+Cards:
+
+My Projects
+Active Projects
+My Tasks
+In Progress
+Completed
+Overdue
+
+Sections:
+
+My Tasks
+Upcoming Deadlines
+Recent Projects
+Notifications
+
+Task click → Task Details.
+
+Project click → Project Details.
+
+==================================================
+ADMIN DASHBOARD
+==================================================
+
+Route:
+
+/admin/dashboard
+
+Create platform-wide analytics dashboard.
+
+Cards:
+
+Total Users
+Active Users
+Total Projects
+Total Tasks
+Total Comments
+Notifications
+
+Charts:
+
+Users by Role
+Users by Status
+Projects by Status
+Tasks by Status
+Tasks by Priority
+Recent Activity
+
+Create clickable analytics sections.
+
+==================================================
+PROJECT LIST
+==================================================
+
+Route:
+
+/projects
+
+Create complete project management page.
+
+Header:
+
+Projects
+
+Actions:
+
+Search
+Filter
+Sort
+Create Project
+
+Project table/cards:
+
+Project Name
+Description
+Status
+Owner
+Members
+Start Date
+Deadline
+Updated
+
+Click project → Project Details.
+
+Filters:
+
+Status
+Owner
+Date
+
+Create empty state:
+
+"No projects found"
+
+Create loading state.
+
+Create error state.
+
+==================================================
+CREATE PROJECT
+==================================================
+
+Create modal AND full-page responsive version.
+
+Fields:
+
+Project Name
+Description
+Start Date
+Deadline
+Status
+
+Validation states.
+
+Buttons:
+
+Cancel
+Create Project
+
+Create loading state.
+
+Success:
+
+"Project created successfully"
+
+Error:
+
+"Failed to create project"
+
+==================================================
+PROJECT DETAILS
+==================================================
+
+Route:
+
+/projects/:projectId
+
+Create complete project page.
+
+Header:
+
+Project Name
+Description
+Status
+Owner
+Deadline
+
+Actions:
+
+Edit
+Delete
+
+Tabs:
+
+Overview
+Tasks
+Members
+Activity
+
+All tabs must be clickable.
+
+==================================================
+PROJECT OVERVIEW
+==================================================
+
+Show:
+
+Project progress
+Task statistics
+Completed tasks
+In progress tasks
+Review tasks
+Overdue tasks
+
+Upcoming deadlines.
+
+Recent activity.
+
+==================================================
+PROJECT TASKS
+==================================================
+
+Show project tasks.
+
+Search.
+
+Filter.
+
+Sort.
+
+Create Task.
+
+Task table:
+
+Task
+Assignee
+Status
+Priority
+Due Date
+
+Task click → Task Details.
+
+==================================================
+PROJECT MEMBERS
+==================================================
+
+Route concept:
+
+/projects/:projectId/members
+
+Show:
+
+Avatar
+Name
+Email
+Role
+Status
+Joined Date
+
+Actions:
+
+Add Member
+Remove Member
+
+Add Member modal:
+
+Search users
+User list
+Select user
+Confirm
+
+States:
+
+No users
+Already member
+Inactive user
+Unauthorized
+Success
+Error
+
+Remove member:
+
+Confirmation dialog.
+
+==================================================
+TASK MANAGEMENT
+==================================================
+
+Route:
+
+/tasks
+
+Create complete task management page.
+
+Header:
+
+My Tasks / Tasks
+
+Search.
+
+Filters:
+
+Project
+Status
+Priority
+Assignee
+Due Date
+
+Sort.
+
+Task table.
+
+Columns:
+
+Task
+Project
+Assignee
+Status
+Priority
+Due Date
+Updated
+
+Create:
+
+Empty state
+Loading state
+Error state
+No search results
+
+==================================================
+CREATE TASK
+==================================================
+
+Modal.
+
+Fields:
+
+Title
+Description
+Project
+Assignee
+Status
+Priority
+Due Date
+
+Buttons:
+
+Cancel
+Create Task
+
+Validation states.
+
+Loading.
+
+Success toast.
+
+Error toast.
+
+==================================================
+TASK DETAILS
+==================================================
+
+Route:
+
+/tasks/:taskId
+
+Create detailed task interface.
+
+Show:
+
+Task title
+Description
+Project
+Assignee
+Created by
+Status
+Priority
+Due Date
+Created Date
+Updated Date
+
+Actions:
+
+Edit
+Assign
+Change Status
+Change Priority
+Delete
+
+All controls must have interactive states.
+
+==================================================
+TASK COMMENTS
+==================================================
+
+Inside Task Details.
+
+Create:
+
+Comments section.
+
+Each comment:
+
+Avatar
+Author
+Timestamp
+Comment
+
+Actions:
+
+Edit
+Delete
+
+Add comment input.
+
+Buttons:
+
+Comment
+Cancel
+
+States:
+
+Empty
+Loading
+Submitting
+Success
+Error
+
+Create edit comment interaction.
+
+Create delete confirmation modal.
+
+==================================================
+MY TASKS
+==================================================
+
+Route:
+
+/my-tasks
+
+Tabs:
+
+All
+To Do
+In Progress
+Review
+Completed
+Overdue
+
+Search.
+
+Filters.
+
+Sorting.
+
+Task list.
+
+Click task → Task Details.
+
+==================================================
+NOTIFICATIONS
+==================================================
+
+Route:
+
+/notifications
+
+Create notification center.
+
+Notification types:
+
+Project member added
+Project member removed
+Task assigned
+Task updated
+Comment activity
+Project activity
+
+Each notification:
+
+Icon
+Message
+Timestamp
+Read/unread state
+
+Actions:
+
+Mark as read
+Mark all as read
+
+Click notification → relevant project/task.
+
+Header notification bell must show unread count.
+
+Create:
+
+No notifications
+Loading
+Error
+
+==================================================
+ADMIN USER MANAGEMENT
+==================================================
+
+Route:
+
+/admin/users
+
+Create complete admin user management.
+
+Table:
+
+Avatar
+Name
+Email
+Role
+Status
+Created
+Actions
+
+Search.
+
+Filters:
+
+Role
+Status
+
+Actions:
+
+View User
+Edit Role
+Activate
+Deactivate
+
+Create confirmation dialogs.
+
+Role options:
+
+Admin
+Project Manager
+Team Member
+
+Prevent dangerous actions visually.
+
+==================================================
+ADMIN USER DETAILS
+==================================================
+
+Route:
+
+/admin/users/:userId
+
+Show:
+
+Profile
+Email
+Role
+Account Status
+Created Date
+Activity
+
+Actions:
+
+Change Role
+Activate
+Deactivate
+
+==================================================
+ADMIN PROJECT MANAGEMENT
+==================================================
+
+Route:
+
+/admin/projects
+
+Show all platform projects.
+
+Columns:
+
+Project
+Owner
+Status
+Members
+Tasks
+Deadline
+Created
+
+Project details clickable.
+
+Admin actions.
+
+==================================================
+ADMIN ANALYTICS
+==================================================
+
+Route:
+
+/admin/analytics
+
+Create complete analytics page.
+
+Sections:
+
+Users by Role
+Users by Status
+Projects by Status
+Tasks by Status
+Tasks by Priority
+Recent Activity
+
+Charts:
+
+Donut
+Bar
+Line
+Progress
+
+Make charts responsive.
+
+==================================================
+PROFILE
+==================================================
+
+Route:
+
+/profile
+
+Show:
+
+Profile picture
+Name
+Email
+Role
+Account status
+
+Edit profile.
+
+Upload/change profile image.
+
+Save changes.
+
+Success/error states.
+
+==================================================
+SETTINGS
+==================================================
+
+Route:
+
+/settings
+
+Sections:
+
+Profile
+Account
+Notifications
+Security
+Appearance
+
+Create:
+
+Change password
+Notification preferences
+Theme preference
+Account information
+
+==================================================
+ERROR PAGES
+==================================================
+
+Create:
+
+404 Not Found
+
+401 Unauthorized
+
+403 Forbidden
+
+400 Validation Error
+
+500 Server Error
+
+Network Error
+
+Each must have:
+
+Clear explanation
+Icon/illustration
+Back button
+Go to Dashboard button
+
+==================================================
+EMPTY STATES
+==================================================
+
+Create reusable empty states for:
+
+No Projects
+No Tasks
+No Notifications
+No Members
+No Search Results
+No Comments
+
+Each should include:
+
+Icon
+Title
+Description
+Primary action where appropriate
+
+==================================================
+LOADING STATES
+==================================================
+
+Create skeleton components for:
+
+Dashboard
+Projects
+Tasks
+Project details
+Task details
+Users
+Notifications
+
+Buttons:
+
+Loading spinner
+
+==================================================
+TOAST SYSTEM
+==================================================
+
+Create reusable toast notifications:
+
+Success
+Error
+Warning
+Info
+
+Examples:
+
+Project created successfully
+Task created successfully
+Task assigned successfully
+Member added successfully
+Member removed successfully
+Comment added successfully
+Changes saved successfully
+Something went wrong
+
+==================================================
+CONFIRMATION DIALOGS
+==================================================
+
+Create reusable dialogs:
+
+Delete Project
+Delete Task
+Delete Comment
+Remove Member
+Deactivate User
+Change User Role
+Logout
+
+Use clear destructive-action styling.
+
+==================================================
+SEARCH
+==================================================
+
+Create global search interaction.
+
+Search results:
+
+Projects
+Tasks
+Users
+
+Show grouped results.
+
+Click result → corresponding page.
+
+Include:
+
+No results
+Loading
+Recent searches
+
+==================================================
+RESPONSIVE DESIGN
+==================================================
+
+Create responsive versions for:
+
+1440px desktop
+1280px desktop
+1024px tablet
+768px tablet
+390px mobile
+375px mobile
+
+Desktop:
+
+Sidebar + content
+
+Tablet:
+
+Collapsible sidebar
+
+Mobile:
+
+Drawer navigation
+Mobile header
+Stacked cards
+Responsive tables
+Bottom actions where appropriate
+
+Do not simply shrink desktop layouts.
+
+Actually redesign layouts for mobile usability.
+
+==================================================
+REALTIME UI
+==================================================
+
+TaskFlow uses Socket.IO.
+
+Create visual states for realtime events.
+
+Examples:
+
+New task appears
+Task status changes
+Task assignment changes
+New comment
+Comment edited
+Comment deleted
+Member added
+Member removed
+New notification
+
+Use subtle animation/transition indicators.
+
+Show realtime notification toast when appropriate.
+
+==================================================
+ROLE-BASED PROTOTYPES
+==================================================
+
+Create separate prototype flows.
+
+PROJECT MANAGER:
+
+Login
+→ Dashboard
+→ Projects
+→ Project Details
+→ Members
+→ Add Member
+→ Tasks
+→ Task Details
+→ Assign Task
+→ Notification
+
+TEAM MEMBER:
+
+Login
+→ Dashboard
+→ My Tasks
+→ Task Details
+→ Change Status
+→ Add Comment
+→ Notifications
+
+ADMIN:
+
+Login
+→ Admin Dashboard
+→ Users
+→ User Details
+→ Change Role
+→ Projects
+→ Analytics
+
+==================================================
+INTERACTION REQUIREMENT
+==================================================
+
+THIS IS CRITICAL.
+
+Every major UI element must have a prototype interaction.
+
+Clickable:
+
+- Sidebar navigation
+- Header navigation
+- Dashboard cards
+- Project cards
+- Task rows
+- User rows
+- Tabs
+- Buttons
+- Dropdowns
+- Filters
+- Search
+- Notifications
+- Profile menu
+- Modals
+- Confirmation dialogs
+- Pagination
+- Breadcrumbs
+- Back buttons
+
+Use overlays for:
+
+- Create Project
+- Edit Project
+- Create Task
+- Edit Task
+- Add Member
+- Remove Member
+- Delete confirmation
+- User role changes
+- Notifications
+
+Use interactive component states for:
+
+- Hover
+- Pressed
+- Focus
+- Disabled
+- Loading
+- Selected
+- Error
+- Success
+
+==================================================
+PROTOTYPE QUALITY
+==================================================
+
+The prototype should feel like a real application.
+
+A user should be able to start at Login and navigate through the complete application without dead-end screens.
+
+Do not create isolated screens.
+
+Connect the screens into realistic workflows.
+
+Use realistic sample data.
+
+Use consistent names, projects, tasks, users and notifications throughout the prototype.
+
+==================================================
+REACT IMPLEMENTATION PREPARATION
+==================================================
+
+Design the application so it can be implemented directly in React.
+
+Use:
+
+- Reusable components
+- Consistent component variants
+- Auto Layout
+- Variables
+- Design tokens
+- Consistent spacing
+- Consistent typography
+- Consistent colors
+- Reusable cards
+- Reusable tables
+- Reusable forms
+- Reusable modals
+- Reusable navigation
+- Reusable status badges
+- Reusable notification components
+
+The final Figma file should function as the complete UI/UX specification for a React frontend.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+Generate the FULL TaskFlow web application.
+
+Do not stop at:
+
+- Login
+- Dashboard
+- One project page
+
+Continue until EVERY major route and interaction described above has been designed and connected.
+
+The final result must look like a professional production SaaS application and must be fully navigable as a Figma prototype.
