@@ -10,6 +10,7 @@ export function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [role, setRole] = useState("team_member");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -35,7 +36,7 @@ export function Register() {
     }
     setLoading(true);
     try {
-      await register({ name, email, password });
+      await register({ name, email, password, role });
       addToast("success", "Account created successfully. Please log in.");
       navigate("/login");
     } catch (err) {
@@ -157,6 +158,24 @@ export function Register() {
             />
           </div>
           {errors.confirm && <p className="mt-1.5 text-xs text-red-600">{errors.confirm}</p>}
+        </div>
+
+        {/* Role */}
+        <div>
+          <label htmlFor="role" className="block text-sm font-medium text-slate-700">
+            Account Type <span className="text-red-500">*</span>
+          </label>
+          <div className="mt-1 relative">
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => { setRole(e.target.value); field("role").onChange(); }}
+              className="block w-full px-3 py-2.5 rounded-lg border text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all border-slate-300 bg-white"
+            >
+              <option value="team_member">Team Member</option>
+              <option value="project_manager">Project Manager</option>
+            </select>
+          </div>
         </div>
 
         <button

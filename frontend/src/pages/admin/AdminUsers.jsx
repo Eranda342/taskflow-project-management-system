@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { Search, ChevronDown } from "lucide-react";
-import { USERS, getRoleLabel, formatDate } from "../../data/mockData";
+import { USERS, formatDate } from "../../data/mockData";
 import { Avatar } from "../../components/Badge";
 import { ConfirmDialog } from "../../components/Modal";
 import { useApp } from "../../context/AppContext";
+
+const ROLE_LABELS = {
+  admin: "Admin",
+  project_manager: "Project Manager",
+  team_member: "Team Member",
+};
 
 export function AdminUsers() {
   const { addToast } = useApp();
@@ -110,7 +116,7 @@ export function AdminUsers() {
                           "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
                         }`}
                       >
-                        {getRoleLabel(user.role)}
+                        {ROLE_LABELS[user.role] || user.role}
                         <ChevronDown className="w-3 h-3" />
                       </button>
                       {openMenu === user.id && (
@@ -199,7 +205,7 @@ export function AdminUsers() {
         onClose={() => setConfirmRoleChange(null)}
         onConfirm={() => { if (confirmRoleChange) changeRole(confirmRoleChange.user.id, confirmRoleChange.role); }}
         title="Change User Role"
-        description={`Change ${confirmRoleChange?.user.name}'s role to ${confirmRoleChange ? getRoleLabel(confirmRoleChange.role) : ""}?`}
+        description={`Change ${confirmRoleChange?.user.name}'s role to ${confirmRoleChange ? ROLE_LABELS[confirmRoleChange.role] : ""}?`}
         confirmLabel="Confirm Role Change"
       />
     </div>

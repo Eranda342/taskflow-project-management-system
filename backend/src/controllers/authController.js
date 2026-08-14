@@ -11,7 +11,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     const errors = {};
 
@@ -60,12 +60,16 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user with forced team_member role to prevent privilege escalation
+    // Determine assigned role (default to team_member)
+    const validRoles = ['team_member', 'project_manager'];
+    const assignedRole = (role && validRoles.includes(role)) ? role : 'team_member';
+
+    // Create user with requested role
     const user = await User.create({
       name: trimmedName,
       email: normalizedEmail,
       password: hashedPassword,
-      role: 'team_member',
+      role: assignedRole,
       status: 'active',
     });
 

@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Users, FolderKanban, CheckSquare, MessageSquare, Bell } from "lucide-react";
-import { USERS, PROJECTS, TASKS, NOTIFICATIONS, COMMENTS } from "../data/mockData";
+import { useApp } from "../context/AppContext";
+import api from "../lib/api";
 
 function DonutChart({ segments, size = 120 }) {
   const total = segments.reduce((s, seg) => s + seg.value, 0);
@@ -11,7 +13,7 @@ function DonutChart({ segments, size = 120 }) {
 
   let offset = 0;
   const slices = segments.map((seg) => {
-    const pct = seg.value / total;
+    const pct = total > 0 ? seg.value / total : 0;
     const dash = pct * circumference;
     const gap = circumference - dash;
     const slice = { ...seg, dashArray: `${dash} ${gap}`, dashOffset: -offset * circumference };
@@ -55,7 +57,7 @@ function BarChart({ bars }) {
           <div className="w-full bg-slate-100 rounded-full h-2">
             <div
               className="h-2 rounded-full transition-all duration-700"
-              style={{ width: `${(bar.value / bar.max) * 100}%`, backgroundColor: bar.color }}
+              style={{ width: `${bar.max > 0 ? (bar.value / bar.max) * 100 : 0}%`, backgroundColor: bar.color }}
             />
           </div>
         </div>
@@ -65,39 +67,83 @@ function BarChart({ bars }) {
 }
 
 export function AdminDashboard() {
-  const totalUsers = USERS.length;
-  const activeUsers = USERS.filter((u) => u.status === "active").length;
-  const totalProjects = PROJECTS.length;
-  const totalTasks = TASKS.length;
-  const totalComments = COMMENTS.length;
-  const unreadNotifs = NOTIFICATIONS.filter((n) => !n.isRead).length;
+  const { addToast } = useApp();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.get("/admin/stats");
+        if (res.data.success) {
+          setData(res.data.data);
+        } else {
+          throw new Error(res.data.message || "Failed to load admin stats");
+        }
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || "Error loading admin stats";
+        setError(msg);
+        addToast("error", msg);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, [addToast]);
+
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Failed to load admin dashboard</h2>
+        <p className="text-slate-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const totalUsers = data.totals?.users || 0;
+  const activeUsers = data.usersByStatus?.active || 0;
+  const totalProjects = data.totals?.projects || 0;
+  const totalTasks = data.totals?.tasks || 0;
+  const totalComments = data.totals?.comments || 0;
+  const unreadNotifs = data.totals?.notifications || 0; // The stats API returns total notifications across platform
 
   const usersByRole = [
-    { label: "Admin", value: USERS.filter((u) => u.role === "admin").length, color: "#DC2626" },
-    { label: "Project Manager", value: USERS.filter((u) => u.role === "project_manager").length, color: "#2563EB" },
-    { label: "Team Member", value: USERS.filter((u) => u.role === "team_member").length, color: "#16A34A" },
+    { label: "Admin", value: data.usersByRole?.admin || 0, color: "#DC2626" },
+    { label: "Project Manager", value: data.usersByRole?.project_manager || 0, color: "#2563EB" },
+    { label: "Team Member", value: data.usersByRole?.team_member || 0, color: "#16A34A" },
   ];
 
   const projectsByStatus = [
-    { label: "Active", value: PROJECTS.filter((p) => p.status === "active").length, color: "#2563EB" },
-    { label: "Review", value: PROJECTS.filter((p) => p.status === "review").length, color: "#D97706" },
-    { label: "Planning", value: PROJECTS.filter((p) => p.status === "planning").length, color: "#64748B" },
-    { label: "On Hold", value: PROJECTS.filter((p) => p.status === "on_hold").length, color: "#94A3B8" },
-    { label: "Completed", value: PROJECTS.filter((p) => p.status === "completed").length, color: "#16A34A" },
+    { label: "Active", value: data.projectsByStatus?.active || 0, color: "#2563EB" },
+    { label: "Planning", value: data.projectsByStatus?.planning || 0, color: "#64748B" },
+    { label: "On Hold", value: data.projectsByStatus?.on_hold || 0, color: "#94A3B8" },
+    { label: "Completed", value: data.projectsByStatus?.completed || 0, color: "#16A34A" },
+    { label: "Cancelled", value: data.projectsByStatus?.cancelled || 0, color: "#DC2626" },
   ];
 
   const tasksByStatus = [
-    { label: "To Do", value: TASKS.filter((t) => t.status === "todo").length, color: "#64748B", max: TASKS.length },
-    { label: "In Progress", value: TASKS.filter((t) => t.status === "in_progress").length, color: "#2563EB", max: TASKS.length },
-    { label: "Review", value: TASKS.filter((t) => t.status === "review").length, color: "#D97706", max: TASKS.length },
-    { label: "Completed", value: TASKS.filter((t) => t.status === "completed").length, color: "#16A34A", max: TASKS.length },
+    { label: "To Do", value: data.tasksByStatus?.todo || 0, color: "#64748B", max: totalTasks },
+    { label: "In Progress", value: data.tasksByStatus?.in_progress || 0, color: "#2563EB", max: totalTasks },
+    { label: "Review", value: data.tasksByStatus?.review || 0, color: "#D97706", max: totalTasks },
+    { label: "Completed", value: data.tasksByStatus?.completed || 0, color: "#16A34A", max: totalTasks },
   ];
 
   const tasksByPriority = [
-    { label: "Urgent", value: TASKS.filter((t) => t.priority === "urgent").length, color: "#DC2626", max: TASKS.length },
-    { label: "High", value: TASKS.filter((t) => t.priority === "high").length, color: "#D97706", max: TASKS.length },
-    { label: "Medium", value: TASKS.filter((t) => t.priority === "medium").length, color: "#2563EB", max: TASKS.length },
-    { label: "Low", value: TASKS.filter((t) => t.priority === "low").length, color: "#64748B", max: TASKS.length },
+    { label: "Urgent", value: data.tasksByPriority?.urgent || 0, color: "#DC2626", max: totalTasks },
+    { label: "High", value: data.tasksByPriority?.high || 0, color: "#D97706", max: totalTasks },
+    { label: "Medium", value: data.tasksByPriority?.medium || 0, color: "#2563EB", max: totalTasks },
+    { label: "Low", value: data.tasksByPriority?.low || 0, color: "#64748B", max: totalTasks },
   ];
 
   return (
@@ -119,7 +165,7 @@ export function AdminDashboard() {
         <AdminStatCard label="Total Projects" value={totalProjects} icon={<FolderKanban className="w-5 h-5" />} color="indigo" to="/app/admin/projects" />
         <AdminStatCard label="Total Tasks" value={totalTasks} icon={<CheckSquare className="w-5 h-5" />} color="violet" to="/app/tasks" />
         <AdminStatCard label="Comments" value={totalComments} icon={<MessageSquare className="w-5 h-5" />} color="teal" />
-        <AdminStatCard label="Unread Alerts" value={unreadNotifs} icon={<Bell className="w-5 h-5" />} color="amber" to="/app/notifications" />
+        <AdminStatCard label="Total Alerts" value={unreadNotifs} icon={<Bell className="w-5 h-5" />} color="amber" />
       </div>
 
       {/* Charts row */}
@@ -175,59 +221,27 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent users + projects */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Users */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-slate-900">Recent Users</h3>
-            <Link to="/app/admin/users" className="text-sm font-medium text-blue-600 hover:text-blue-700">Manage users</Link>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {USERS.slice(0, 5).map((user) => (
-              <Link key={user.id} to={`/app/admin/users/${user.id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors group">
-                <div className={`w-9 h-9 rounded-full ${user.color} flex items-center justify-center text-white font-semibold text-sm shrink-0`}>
-                  {user.initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-900 group-hover:text-blue-600 transition-colors">{user.name}</div>
-                  <div className="text-xs text-slate-500">{user.email}</div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <RoleBadge role={user.role} />
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${user.status === "active" ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
-                    {user.status}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+      {/* Recent Activity (API doesn't return full user/project lists for stats endpoint) */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-200">
+          <h3 className="text-base font-semibold text-slate-900">Recent Activity (Last 7 Days)</h3>
         </div>
-
-        {/* Platform Projects */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-slate-900">Platform Projects</h3>
-            <Link to="/app/admin/projects" className="text-sm font-medium text-blue-600 hover:text-blue-700">View all</Link>
+        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+            <div className="text-sm font-medium text-slate-500 mb-1">New Users</div>
+            <div className="text-2xl font-bold text-slate-900">{data.recentActivity?.usersCreatedLast7Days || 0}</div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {PROJECTS.map((proj) => (
-              <Link key={proj.id} to={`/app/projects/${proj.id}`} className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors group">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-900 group-hover:text-blue-600 transition-colors truncate">{proj.name}</div>
-                  <div className="text-xs text-slate-500">{proj.memberIds.length} members · {proj.tasksTotal} tasks</div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="hidden sm:flex items-center gap-2">
-                    <div className="w-20 bg-slate-100 rounded-full h-1.5">
-                      <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${proj.progress}%` }} />
-                    </div>
-                    <span className="text-xs text-slate-500 w-8">{proj.progress}%</span>
-                  </div>
-                  <ProjectStatusDot status={proj.status} />
-                </div>
-              </Link>
-            ))}
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+            <div className="text-sm font-medium text-slate-500 mb-1">New Projects</div>
+            <div className="text-2xl font-bold text-slate-900">{data.recentActivity?.projectsCreatedLast7Days || 0}</div>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+            <div className="text-sm font-medium text-slate-500 mb-1">New Tasks</div>
+            <div className="text-2xl font-bold text-slate-900">{data.recentActivity?.tasksCreatedLast7Days || 0}</div>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+            <div className="text-sm font-medium text-slate-500 mb-1">New Comments</div>
+            <div className="text-2xl font-bold text-slate-900">{data.recentActivity?.commentsCreatedLast7Days || 0}</div>
           </div>
         </div>
       </div>
@@ -247,38 +261,9 @@ function AdminStatCard({ label, value, icon, color, to }) {
   const inner = (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:border-blue-300 transition-colors">
       <div className={`w-9 h-9 rounded-lg ${colors[color]} flex items-center justify-center mb-3`}>{icon}</div>
-      <div className="text-2xl font-bold text-slate-900">{value}</div>
+      <div className="text-2xl font-bold text-slate-900">{value !== undefined ? value : "-"}</div>
       <div className="text-xs text-slate-500 mt-0.5 font-medium">{label}</div>
     </div>
   );
   return to ? <Link to={to}>{inner}</Link> : <div>{inner}</div>;
-}
-
-function RoleBadge({ role }) {
-  const map = {
-    admin: "bg-red-50 text-red-700 border border-red-200",
-    project_manager: "bg-blue-50 text-blue-700 border border-blue-200",
-    team_member: "bg-slate-100 text-slate-700 border border-slate-200",
-  };
-  const labels = {
-    admin: "Admin",
-    project_manager: "PM",
-    team_member: "Member",
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${map[role]}`}>
-      {labels[role]}
-    </span>
-  );
-}
-
-function ProjectStatusDot({ status }) {
-  const colors = {
-    active: "bg-blue-500",
-    review: "bg-amber-500",
-    planning: "bg-slate-400",
-    on_hold: "bg-slate-300",
-    completed: "bg-green-500",
-  };
-  return <div className={`w-2 h-2 rounded-full ${colors[status] ?? "bg-slate-300"}`} />;
 }

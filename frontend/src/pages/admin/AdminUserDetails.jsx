@@ -1,8 +1,14 @@
 import { useParams, Link } from "react-router";
 import { ChevronRight, Shield, UserCheck, UserX } from "lucide-react";
-import { USERS, TASKS, PROJECTS, getRoleLabel, formatDate } from "../../data/mockData";
+import { USERS, TASKS, PROJECTS, formatDate } from "../../data/mockData";
 import { Avatar } from "../../components/Badge";
 import { useApp } from "../../context/AppContext";
+
+const ROLE_LABELS = {
+  admin: "Admin",
+  project_manager: "Project Manager",
+  team_member: "Team Member",
+};
 
 export function AdminUserDetails() {
   const { userId } = useParams();
@@ -43,7 +49,7 @@ export function AdminUserDetails() {
                 user.role === "project_manager" ? "bg-blue-50 text-blue-700 border-blue-200" :
                 "bg-slate-100 text-slate-700 border-slate-200"
               }`}>
-                {getRoleLabel(user.role)}
+                {ROLE_LABELS[user.role] || user.role}
               </span>
               <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
                 user.status === "active" ? "bg-green-50 text-green-700 border-green-200" : "bg-slate-100 text-slate-600 border-slate-200"

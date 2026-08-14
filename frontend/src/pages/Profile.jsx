@@ -3,14 +3,18 @@ import { Camera, Save } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { USERS } from "../data/mockData";
 
-const ROLE_USERS = { pm: "u1", member: "u3", admin: "u9" };
-
 export function Profile() {
-  const { role, addToast } = useApp();
-  const userId = ROLE_USERS[role] ?? "u1";
-  const user = USERS.find((u) => u.id === userId) ?? USERS[0];
+  const { user: authUser, addToast } = useApp();
+  
+  // Use auth user data, fallback to mock data only for rendering missing fields (like color) until Phase 7
+  const user = authUser ? {
+    ...authUser,
+    initials: authUser.name ? authUser.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "U",
+    color: "bg-blue-600",
+    createdAt: authUser.createdAt || new Date().toISOString()
+  } : USERS[0];
 
-  const [form, setForm] = useState({ name: user.name, email: user.email });
+  const [form, setForm] = useState({ name: user.name || "", email: user.email || "" });
   const [saving, setSaving] = useState(false);
 
   const handleSave = (e) => {

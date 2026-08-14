@@ -1,25 +1,70 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { PROJECTS, TASKS, getUser } from "../data/mockData";
 import { StatusBadge, PriorityBadge } from "../components/Badge";
 import { useApp } from "../context/AppContext";
-
-const ROLE_USERS = {
-  pm: { name: "Alex" },
-  member: { name: "David" },
-  admin: { name: "Admin" },
-};
+import api from "../lib/api";
 
 export function Dashboard() {
-  const { role, addToast } = useApp();
-  const userName = ROLE_USERS[role]?.name ?? "there";
+  const { user, addToast } = useApp();
+  const userName = user?.name ? user.name.split(" ")[0] : "there";
 
-  const activeProjects = PROJECTS.filter((p) => p.status === "active").length;
-  const totalTasks = TASKS.length;
-  const overdueTasks = TASKS.filter((t) => t.status !== "completed" && new Date(t.dueDate) < new Date("2026-08-12")).length;
-  const completedTasks = TASKS.filter((t) => t.status === "completed").length;
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const recentProjects = PROJECTS.slice(0, 4);
-  const recentTasks = TASKS.slice(0, 5);
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await api.get("/dashboard");
+        if (res.data.success) {
+          setData(res.data.data);
+        } else {
+          throw new Error(res.data.message || "Failed to load dashboard data");
+        }
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || "Error loading dashboard";
+        setError(msg);
+        addToast("error", msg);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, [addToast]);
+
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto py-12 text-center">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Failed to load dashboard</h2>
+        <p className="text-slate-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // Adapt for both project_manager and team_member if needed, though this is primarily for PM
+  const isPM = data.role === "project_manager";
+  
+  const totalProjects = isPM ? data.projects?.totalAccessible : data.projects?.total;
+  const activeProjects = data.projects?.active;
+  
+  const tasksData = isPM ? data.tasks : data.myTasks;
+  const totalTasks = isPM ? tasksData?.totalAccessible : tasksData?.total;
+  const overdueTasks = tasksData?.overdue;
+  const completedTasks = tasksData?.completed;
+
+  const recentProjects = data.recentProjects || [];
+  const recentTasks = data.recentTasks || data.recentAssignedTasks || [];
+  const upcomingDeadlines = data.upcomingDeadlines || [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -40,8 +85,8 @@ export function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Projects" value={PROJECTS.length} trend="+2 this month" color="blue" />
-        <StatCard title="Active Projects" value={activeProjects} trend="3 completing soon" color="emerald" />
+        <StatCard title="Total Projects" value={totalProjects} trend="Across your teams" color="blue" />
+        <StatCard title="Active Projects" value={activeProjects} trend="Currently active" color="emerald" />
         <StatCard title="Total Tasks" value={totalTasks} trend={`${completedTasks} completed`} color="indigo" />
         <StatCard title="Overdue Tasks" value={overdueTasks} trend="Needs attention" color="red" alert={overdueTasks > 0} />
       </div>
@@ -61,30 +106,23 @@ export function Dashboard() {
                   <tr>
                     <th className="px-6 py-3 font-medium">Project</th>
                     <th className="px-6 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3 font-medium">Progress</th>
                     <th className="px-6 py-3 font-medium">Deadline</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recentProjects.map((proj) => (
-                    <tr key={proj.id} className="hover:bg-slate-50 transition-colors group">
+                  {recentProjects.length === 0 ? (
+                    <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500">No projects found.</td></tr>
+                  ) : recentProjects.map((proj) => (
+                    <tr key={proj._id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <Link to={`/app/projects/${proj.id}`} className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors block">
+                        <Link to={`/app/projects/${proj._id}`} className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors block">
                           {proj.name}
                         </Link>
                         <div className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{proj.description}</div>
                       </td>
                       <td className="px-6 py-4"><StatusBadge status={proj.status} /></td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-full bg-slate-100 rounded-full h-2 max-w-[120px]">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${proj.progress}%` }} />
-                          </div>
-                          <span className="text-xs font-medium text-slate-600">{proj.progress}%</span>
-                        </div>
-                      </td>
                       <td className="px-6 py-4 text-slate-600 font-medium">
-                        {new Date(proj.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {proj.deadline ? new Date(proj.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None"}
                       </td>
                     </tr>
                   ))}
@@ -96,17 +134,19 @@ export function Dashboard() {
           {/* Recent Tasks */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-base font-semibold text-slate-900">Recent Tasks</h3>
+              <h3 className="text-base font-semibold text-slate-900">{isPM ? "Recent Tasks" : "Recent Assigned Tasks"}</h3>
               <Link to="/app/tasks" className="text-sm font-medium text-blue-600 hover:text-blue-700">View all</Link>
             </div>
             <div className="divide-y divide-slate-100">
-              {recentTasks.map((task) => {
-                const assignee = getUser(task.assigneeId);
-                const isOverdue = task.status !== "completed" && new Date(task.dueDate) < new Date("2026-08-12");
+              {recentTasks.length === 0 ? (
+                <div className="px-6 py-8 text-center text-slate-500">No tasks found.</div>
+              ) : recentTasks.map((task) => {
+                const assignee = task.assignedTo;
+                const isOverdue = task.status !== "completed" && task.dueDate && new Date(task.dueDate) < new Date();
                 return (
                   <Link
-                    key={task.id}
-                    to={`/app/tasks/${task.id}`}
+                    key={task._id}
+                    to={`/app/tasks/${task._id}`}
                     className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors group"
                   >
                     <div className="flex-1 min-w-0">
@@ -119,7 +159,7 @@ export function Dashboard() {
                       <PriorityBadge priority={task.priority} />
                       <StatusBadge status={task.status} />
                       <span className={`text-xs font-medium ${isOverdue ? "text-red-600" : "text-slate-500"}`}>
-                        {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No due date"}
                       </span>
                     </div>
                   </Link>
@@ -136,10 +176,10 @@ export function Dashboard() {
             <h3 className="text-base font-semibold text-slate-900 mb-5">Task Status</h3>
             <div className="space-y-3">
               {[
-                { label: "To Do", count: TASKS.filter((t) => t.status === "todo").length, color: "bg-slate-500" },
-                { label: "In Progress", count: TASKS.filter((t) => t.status === "in_progress").length, color: "bg-blue-600" },
-                { label: "Review", count: TASKS.filter((t) => t.status === "review").length, color: "bg-amber-500" },
-                { label: "Completed", count: completedTasks, color: "bg-green-600" },
+                { label: "To Do", count: tasksData?.todo || 0, color: "bg-slate-500" },
+                { label: "In Progress", count: tasksData?.inProgress || 0, color: "bg-blue-600" },
+                { label: "Review", count: tasksData?.review || 0, color: "bg-amber-500" },
+                { label: "Completed", count: tasksData?.completed || 0, color: "bg-green-600" },
               ].map((item) => (
                 <Link to="/app/tasks" key={item.label} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-slate-100 hover:border-blue-200 transition-colors cursor-pointer">
                   <div className="flex items-center gap-3">
@@ -158,25 +198,22 @@ export function Dashboard() {
               <h3 className="text-base font-semibold text-slate-900">Upcoming Deadlines</h3>
             </div>
             <div className="divide-y divide-slate-100">
-              {TASKS
-                .filter((t) => t.status !== "completed")
-                .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-                .slice(0, 4)
-                .map((task) => {
-                  const daysLeft = Math.ceil((new Date(task.dueDate).getTime() - new Date("2026-08-12").getTime()) / 86400000);
-                  const proj = task.projectId ? PROJECTS.find((p) => p.id === task.projectId) : null;
-                  return (
-                    <Link key={task.id} to={`/app/tasks/${task.id}`} className="block px-6 py-4 hover:bg-slate-50 transition-colors">
-                      <div className="font-medium text-slate-900 text-sm truncate">{task.title}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs text-slate-500">{proj?.name ?? ""}</span>
-                        <span className={`text-xs font-semibold ${daysLeft <= 0 ? "text-red-600" : daysLeft <= 3 ? "text-amber-600" : "text-slate-600"}`}>
-                          {daysLeft <= 0 ? "Overdue" : `${daysLeft}d left`}
-                        </span>
-                      </div>
-                    </Link>
-                  );
-                })}
+              {upcomingDeadlines.length === 0 ? (
+                <div className="px-6 py-8 text-center text-slate-500 text-sm">No upcoming deadlines.</div>
+              ) : upcomingDeadlines.map((task) => {
+                const daysLeft = Math.ceil((new Date(task.dueDate).getTime() - new Date().getTime()) / 86400000);
+                return (
+                  <Link key={task._id} to={`/app/tasks/${task._id}`} className="block px-6 py-4 hover:bg-slate-50 transition-colors">
+                    <div className="font-medium text-slate-900 text-sm truncate">{task.title}</div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-slate-500">{task.project?.name ?? ""}</span>
+                      <span className={`text-xs font-semibold ${daysLeft < 0 ? "text-red-600" : daysLeft <= 3 ? "text-amber-600" : "text-slate-600"}`}>
+                        {daysLeft < 0 ? "Overdue" : daysLeft === 0 ? "Today" : `${daysLeft}d left`}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 text-center">
               <Link to="/app/tasks" className="text-sm font-medium text-blue-600 hover:text-blue-700">View all tasks</Link>
@@ -194,7 +231,7 @@ function StatCard({ title, value, trend, color, alert }) {
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-sm font-medium text-slate-500">{title}</h3>
       </div>
-      <div className="text-3xl font-bold tracking-tight text-slate-900 mb-1">{value}</div>
+      <div className="text-3xl font-bold tracking-tight text-slate-900 mb-1">{value !== undefined ? value : "-"}</div>
       <p className={`text-xs font-medium ${alert ? "text-red-500" : "text-slate-500"}`}>{trend}</p>
     </div>
   );

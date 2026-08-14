@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   Calendar,
@@ -11,15 +11,30 @@ import {
   UserMinus,
   ChevronRight,
 } from "lucide-react";
-import { PROJECTS, USERS, getUser, getProjectTasks, formatDate, timeAgo } from "../data/mockData";
 import { StatusBadge, PriorityBadge, Avatar } from "../components/Badge";
 import { Modal, ConfirmDialog } from "../components/Modal";
 import { useApp } from "../context/AppContext";
+import api from "../lib/api";
+
+function formatDate(dateString) {
+  if (!dateString) return "No date";
+  return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  const diff = Date.now() - new Date(dateString).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
+}
 
 export function ProjectDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToast } = useApp();
+  const { addToast, user: currentUser } = useApp();
+  
   const [activeTab, setActiveTab] = useState("overview");
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -28,34 +43,110 @@ export function ProjectDetails() {
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
 
-  const project = PROJECTS.find((p) => p.id === id);
-  if (!project) {
+  const [project, setProject] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchProjectData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [projRes, tasksRes] = await Promise.all([
+        api.get(`/projects/${id}`),
+        api.get(`/projects/${id}/tasks`)
+      ]);
+
+      if (projRes.data.success) {
+        setProject(projRes.data.data.project);
+      } else {
+        throw new Error(projRes.data.message || "Failed to load project");
+      }
+
+      if (tasksRes.data.success) {
+        setTasks(tasksRes.data.data.tasks);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error loading project";
+      setError(msg);
+      addToast("error", msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, addToast]);
+
+  useEffect(() => {
+    fetchProjectData();
+  }, [fetchProjectData]);
+
+  const handleDeleteProject = async () => {
+    try {
+      const res = await api.delete(`/projects/${id}`);
+      if (res.data.success) {
+        addToast("success", "Project deleted");
+        navigate("/app/projects");
+      } else {
+        throw new Error(res.data.message || "Failed to delete project");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error deleting project";
+      addToast("error", msg);
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    try {
+      const res = await api.delete(`/projects/${id}/members/${userId}`);
+      if (res.data.success) {
+        addToast("success", "Member removed from project");
+        setProject(prev => ({
+          ...prev,
+          members: prev.members.filter(m => m._id !== userId)
+        }));
+      } else {
+        throw new Error(res.data.message || "Failed to remove member");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error removing member";
+      addToast("error", msg);
+    } finally {
+      setRemoveMemberConfirm(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error || !project) {
     return (
       <div className="max-w-2xl mx-auto text-center py-24">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Project not found</h2>
-        <p className="text-slate-500 mb-6">The project you are looking for does not exist.</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Project Error</h2>
+        <p className="text-slate-500 mb-6">{error || "The project you are looking for does not exist."}</p>
         <Link to="/app/projects" className="text-blue-600 hover:text-blue-700 font-medium">← Back to Projects</Link>
       </div>
     );
   }
 
-  const owner = getUser(project.ownerId);
-  const [localMemberIds, setLocalMemberIds] = useState(project.memberIds);
-  const [localTasks, setLocalTasks] = useState(() => getProjectTasks(project.id));
-  const members = localMemberIds.map((mid) => getUser(mid)).filter(Boolean);
-  const filteredTasks = localTasks.filter((t) => {
+  const owner = project.owner;
+  const members = project.members || [];
+  
+  const filteredTasks = tasks.filter((t) => {
     const matchSearch = t.title.toLowerCase().includes(taskSearch.toLowerCase());
     const matchFilter = taskFilter === "all" || t.status === taskFilter;
     return matchSearch && matchFilter;
   });
 
-  const ACTIVITY = [
-    { id: 1, user: owner, action: "created this project", time: project.startDate + "T09:00:00Z" },
-    { id: 2, user: members[1] || owner, action: "updated project status to Active", time: "2026-08-01T10:30:00Z" },
-    { id: 3, user: members[0] || owner, action: "added 3 new tasks to the board", time: "2026-08-05T14:00:00Z" },
-    { id: 4, user: owner, action: "set deadline to " + formatDate(project.deadline), time: "2026-08-08T09:00:00Z" },
-    { id: 5, user: members[2] || owner, action: "completed task \"Setup CI/CD pipeline\"", time: "2026-08-10T16:00:00Z" },
-  ];
+  const tasksTotal = tasks.length;
+  const tasksCompleted = tasks.filter((t) => t.status === "completed").length;
+  const progress = tasksTotal === 0 ? 0 : Math.round((tasksCompleted / tasksTotal) * 100);
+
+  const canManageMembers = currentUser.role === "admin" || currentUser.role === "project_manager";
+  const canManageProject = currentUser.role === "admin" || (currentUser.role === "project_manager" && owner?._id === currentUser._id);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -78,13 +169,17 @@ export function ProjectDetails() {
             <div className="flex flex-wrap items-center gap-6 text-sm text-slate-600">
               {owner && (
                 <div className="flex items-center gap-2">
-                  <Avatar name={owner.name} initials={owner.initials} color={owner.color} size="sm" />
+                  {owner.profileImage ? (
+                    <img src={owner.profileImage} alt={owner.name} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <Avatar name={owner.name} initials={owner.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
+                  )}
                   <span>{owner.name}</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                <span>Due {formatDate(project.deadline)}</span>
+                <span>Due {project.deadline ? formatDate(project.deadline) : "None"}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-slate-400" />
@@ -92,37 +187,39 @@ export function ProjectDetails() {
               </div>
               <div className="flex items-center gap-1.5">
                 <CheckSquare className="w-4 h-4 text-slate-400" />
-                <span>{project.tasksCompleted}/{project.tasksTotal} tasks</span>
+                <span>{tasksCompleted}/{tasksTotal} tasks</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => addToast("info", "Edit project coming soon")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </button>
-            <button
-              onClick={() => setDeleteOpen(true)}
-              className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          {canManageProject && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => addToast("info", "Edit project coming soon")}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => setDeleteOpen(true)}
+                className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
         <div className="mt-5 pt-5 border-t border-slate-100">
           <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
             <span className="font-medium">Overall Progress</span>
-            <span className="font-semibold text-slate-900">{project.progress}%</span>
+            <span className="font-semibold text-slate-900">{progress}%</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-700"
-              style={{ width: `${project.progress}%` }}
+              style={{ width: `${progress}%` }}
             />
           </div>
         </div>
@@ -141,7 +238,7 @@ export function ProjectDetails() {
             }`}
           >
             {tab}
-            {tab === "tasks" && <span className="ml-2 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">{localTasks.length}</span>}
+            {tab === "tasks" && <span className="ml-2 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">{tasksTotal}</span>}
             {tab === "members" && <span className="ml-2 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">{members.length}</span>}
           </button>
         ))}
@@ -154,10 +251,10 @@ export function ProjectDetails() {
           <div className="lg:col-span-2 space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: "To Do", count: localTasks.filter((t) => t.status === "todo").length, color: "bg-slate-500" },
-                { label: "In Progress", count: localTasks.filter((t) => t.status === "in_progress").length, color: "bg-blue-500" },
-                { label: "Review", count: localTasks.filter((t) => t.status === "review").length, color: "bg-amber-500" },
-                { label: "Completed", count: localTasks.filter((t) => t.status === "completed").length, color: "bg-green-500" },
+                { label: "To Do", count: tasks.filter((t) => t.status === "todo").length, color: "bg-slate-500" },
+                { label: "In Progress", count: tasks.filter((t) => t.status === "in_progress").length, color: "bg-blue-500" },
+                { label: "Review", count: tasks.filter((t) => t.status === "review").length, color: "bg-amber-500" },
+                { label: "Completed", count: tasksCompleted, color: "bg-green-500" },
               ].map((item) => (
                 <div key={item.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
                   <div className={`w-2.5 h-2.5 rounded-full ${item.color} mb-3`} />
@@ -170,30 +267,41 @@ export function ProjectDetails() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <h3 className="text-sm font-semibold text-slate-900 mb-4">Recent Tasks</h3>
               <div className="space-y-3">
-                {localTasks.slice(0, 5).map((task) => {
-                  const assignee = getUser(task.assigneeId);
+                {tasks.slice(0, 5).map((task) => {
+                  const assignee = task.assignedTo;
                   return (
                     <Link
-                      key={task.id}
-                      to={`/app/tasks/${task.id}`}
+                      key={task._id}
+                      to={`/app/tasks/${task._id}`}
                       className="flex items-center gap-4 p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors group"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-slate-900 group-hover:text-blue-600 transition-colors truncate">{task.title}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{formatDate(task.dueDate)}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{task.dueDate ? formatDate(task.dueDate) : "No due date"}</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <PriorityBadge priority={task.priority} />
                         <StatusBadge status={task.status} />
-                        {assignee && <Avatar name={assignee.name} initials={assignee.initials} color={assignee.color} size="sm" />}
+                        {assignee && (
+                          assignee.profileImage ? (
+                            <img src={assignee.profileImage} alt={assignee.name} className="w-6 h-6 rounded-full" />
+                          ) : (
+                            <Avatar name={assignee.name} initials={assignee.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
+                          )
+                        )}
                       </div>
                     </Link>
                   );
                 })}
+                {tasks.length === 0 && (
+                  <div className="text-sm text-slate-500 text-center py-4">No tasks found in this project.</div>
+                )}
               </div>
-              <button onClick={() => setActiveTab("tasks")} className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700">
-                View all tasks →
-              </button>
+              {tasks.length > 5 && (
+                <button onClick={() => setActiveTab("tasks")} className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700">
+                  View all tasks →
+                </button>
+              )}
             </div>
           </div>
 
@@ -208,17 +316,21 @@ export function ProjectDetails() {
                 </div>
                 <div>
                   <dt className="text-slate-500 text-xs font-medium mb-0.5">Start Date</dt>
-                  <dd className="font-medium text-slate-900">{formatDate(project.startDate)}</dd>
+                  <dd className="font-medium text-slate-900">{project.startDate ? formatDate(project.startDate) : "None"}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500 text-xs font-medium mb-0.5">Deadline</dt>
-                  <dd className="font-medium text-slate-900">{formatDate(project.deadline)}</dd>
+                  <dd className="font-medium text-slate-900">{project.deadline ? formatDate(project.deadline) : "None"}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500 text-xs font-medium mb-0.5">Owner</dt>
                   {owner && (
                     <dd className="flex items-center gap-2">
-                      <Avatar name={owner.name} initials={owner.initials} color={owner.color} size="sm" />
+                      {owner.profileImage ? (
+                        <img src={owner.profileImage} alt={owner.name} className="w-6 h-6 rounded-full" />
+                      ) : (
+                        <Avatar name={owner.name} initials={owner.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
+                      )}
                       <span className="font-medium text-slate-900">{owner.name}</span>
                     </dd>
                   )}
@@ -230,8 +342,12 @@ export function ProjectDetails() {
               <h3 className="text-sm font-semibold text-slate-900 mb-4">Team Members</h3>
               <div className="space-y-3">
                 {members.slice(0, 4).map((m) => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <Avatar name={m.name} initials={m.initials} color={m.color} size="sm" />
+                  <div key={m._id} className="flex items-center gap-3">
+                    {m.profileImage ? (
+                      <img src={m.profileImage} alt={m.name} className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <Avatar name={m.name} initials={m.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
+                    )}
                     <div>
                       <div className="text-sm font-medium text-slate-900">{m.name}</div>
                       <div className="text-xs text-slate-500">{m.role === "project_manager" ? "Project Manager" : "Team Member"}</div>
@@ -272,13 +388,15 @@ export function ProjectDetails() {
                 <option value="completed">Completed</option>
               </select>
             </div>
-            <button
-              onClick={() => setCreateTaskOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              Create Task
-            </button>
+            {canManageProject && (
+              <button
+                onClick={() => setCreateTaskOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                Create Task
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -293,25 +411,31 @@ export function ProjectDetails() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredTasks.map((task) => {
-                  const assignee = getUser(task.assigneeId);
+                  const assignee = task.assignedTo;
                   return (
-                    <tr key={task.id} className="hover:bg-slate-50 transition-colors group">
+                    <tr key={task._id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4">
-                        <Link to={`/app/tasks/${task.id}`} className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">
+                        <Link to={`/app/tasks/${task._id}`} className="font-medium text-slate-900 group-hover:text-blue-600 transition-colors">
                           {task.title}
                         </Link>
                       </td>
                       <td className="px-6 py-4">
-                        {assignee && (
+                        {assignee ? (
                           <div className="flex items-center gap-2">
-                            <Avatar name={assignee.name} initials={assignee.initials} color={assignee.color} size="sm" />
+                            {assignee.profileImage ? (
+                              <img src={assignee.profileImage} alt={assignee.name} className="w-6 h-6 rounded-full" />
+                            ) : (
+                              <Avatar name={assignee.name} initials={assignee.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
+                            )}
                             <span className="text-slate-700">{assignee.name}</span>
                           </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">Unassigned</span>
                         )}
                       </td>
                       <td className="px-6 py-4"><StatusBadge status={task.status} /></td>
                       <td className="px-6 py-4"><PriorityBadge priority={task.priority} /></td>
-                      <td className="px-6 py-4 text-slate-600">{formatDate(task.dueDate)}</td>
+                      <td className="px-6 py-4 text-slate-600">{task.dueDate ? formatDate(task.dueDate) : "None"}</td>
                     </tr>
                   );
                 })}
@@ -327,32 +451,40 @@ export function ProjectDetails() {
       {activeTab === "members" && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="text-base font-semibold text-slate-900">{localMemberIds.length} Members</h3>
-            <button
-              onClick={() => setAddMemberOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <UserPlus className="w-4 h-4" />
-              Add Member
-            </button>
+            <h3 className="text-base font-semibold text-slate-900">{members.length} Members</h3>
+            {canManageMembers && (
+              <button
+                onClick={() => setAddMemberOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Member
+              </button>
+            )}
           </div>
           <div className="divide-y divide-slate-100">
             {members.map((member) => (
-              <div key={member.id} className="flex items-center gap-4 px-6 py-4">
-                <Avatar name={member.name} initials={member.initials} color={member.color} size="md" />
+              <div key={member._id} className="flex items-center gap-4 px-6 py-4">
+                {member.profileImage ? (
+                  <img src={member.profileImage} alt={member.name} className="w-10 h-10 rounded-full" />
+                ) : (
+                  <Avatar name={member.name} initials={member.name?.[0]} color="bg-slate-100 text-slate-700" size="md" />
+                )}
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-slate-900">{member.name}</div>
                   <div className="text-xs text-slate-500">{member.email}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
-                    member.role === "project_manager" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-700 border-slate-200"
+                    member.role === "admin" || member.role === "project_manager" 
+                      ? "bg-blue-50 text-blue-700 border-blue-200" 
+                      : "bg-slate-100 text-slate-700 border-slate-200"
                   }`}>
-                    {member.role === "project_manager" ? "Manager" : "Member"}
+                    {member.role === "admin" ? "Admin" : member.role === "project_manager" ? "Manager" : "Member"}
                   </span>
-                  {member.id !== project.ownerId && (
+                  {canManageMembers && member._id !== owner?._id && (
                     <button
-                      onClick={() => setRemoveMemberConfirm(member.id)}
+                      onClick={() => setRemoveMemberConfirm(member._id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <UserMinus className="w-4 h-4" />
@@ -366,24 +498,9 @@ export function ProjectDetails() {
       )}
 
       {activeTab === "activity" && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h3 className="text-base font-semibold text-slate-900 mb-6">Project Activity</h3>
-          <div className="space-y-6">
-            {ACTIVITY.map((item) => (
-              <div key={item.id} className="flex gap-4">
-                {item.user && (
-                  <Avatar name={item.user.name} initials={item.user.initials} color={item.user.color} size="sm" />
-                )}
-                <div>
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">{item.user?.name}</span>{" "}
-                    {item.action}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">{timeAgo(item.time)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 text-center">
+          <h3 className="text-base font-semibold text-slate-900 mb-2">Project Activity</h3>
+          <p className="text-sm text-slate-500">Activity feed is not currently tracked by the backend API.</p>
         </div>
       )}
 
@@ -391,36 +508,34 @@ export function ProjectDetails() {
       <CreateTaskModal
         open={createTaskOpen}
         onClose={() => setCreateTaskOpen(false)}
-        projectId={project.id}
-        onTaskCreated={(t) => setLocalTasks((prev) => [...prev, t])}
+        projectId={project._id}
+        members={members}
+        onTaskCreated={(t) => setTasks((prev) => [...prev, t])}
       />
+      
       <AddMemberModal
         open={addMemberOpen}
         onClose={() => setAddMemberOpen(false)}
-        existingIds={localMemberIds}
-        onMemberAdded={(uid) => setLocalMemberIds((prev) => [...prev, uid])}
+        projectId={project._id}
+        onMemberAdded={(newMembers) => setProject(prev => ({ ...prev, members: newMembers }))}
       />
+      
       <ConfirmDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        onConfirm={() => { addToast("success", "Project deleted"); navigate("/app/projects"); }}
+        onConfirm={handleDeleteProject}
         title="Delete Project"
         description={`Are you sure you want to delete "${project.name}"? This action cannot be undone.`}
         confirmLabel="Delete Project"
         danger
       />
+      
       <ConfirmDialog
         open={!!removeMemberConfirm}
         onClose={() => setRemoveMemberConfirm(null)}
-        onConfirm={() => {
-          if (removeMemberConfirm) {
-            setLocalMemberIds((prev) => prev.filter((mid) => mid !== removeMemberConfirm));
-            addToast("success", "Member removed from project");
-          }
-          setRemoveMemberConfirm(null);
-        }}
+        onConfirm={() => handleRemoveMember(removeMemberConfirm)}
         title="Remove Member"
-        description="Are you sure you want to remove this member from the project?"
+        description="Are you sure you want to remove this member from the project? They will be unassigned from all tasks in this project."
         confirmLabel="Remove"
         danger
       />
@@ -428,36 +543,56 @@ export function ProjectDetails() {
   );
 }
 
-function CreateTaskModal({ open, onClose, projectId, onTaskCreated }) {
+function CreateTaskModal({ open, onClose, projectId, members, onTaskCreated }) {
   const { addToast } = useApp();
-  const [form, setForm] = useState({ title: "", description: "", assignee: "", priority: "medium", dueDate: "" });
+  const [form, setForm] = useState({ title: "", description: "", assignedTo: "", priority: "medium", dueDate: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    const newTask = {
-      id: `lt-${Date.now()}`,
-      projectId,
-      title: form.title,
-      description: form.description,
-      status: "todo",
-      priority: form.priority,
-      assigneeId: form.assignee || "u1",
-      createdById: "u1",
-      dueDate: form.dueDate || new Date(Date.now() + 7 * 86400000).toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      commentsCount: 0,
-    };
-    onTaskCreated(newTask);
-    addToast("success", "Task created successfully");
-    onClose();
-    setForm({ title: "", description: "", assignee: "", priority: "medium", dueDate: "" });
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = {
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
+      };
+      
+      if (form.dueDate) {
+        payload.dueDate = form.dueDate;
+      }
+      
+      if (form.assignedTo) {
+        payload.assignedTo = form.assignedTo;
+      }
+
+      const res = await api.post(`/projects/${projectId}/tasks`, payload);
+      
+      if (res.data.success) {
+        onTaskCreated(res.data.data.task);
+        addToast("success", "Task created successfully");
+        onClose();
+        setForm({ title: "", description: "", assignedTo: "", priority: "medium", dueDate: "" });
+      } else {
+        throw new Error(res.data.message || "Failed to create task");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error creating task";
+      setError(msg);
+      addToast("error", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Modal open={open} onClose={onClose} title="Create Task" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <div className="p-3 bg-red-50 text-red-600 rounded text-sm">{error}</div>}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Title *</label>
           <input
@@ -470,12 +605,13 @@ function CreateTaskModal({ open, onClose, projectId, onTaskCreated }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description *</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Add a description..."
             rows={3}
+            required
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
@@ -483,12 +619,12 @@ function CreateTaskModal({ open, onClose, projectId, onTaskCreated }) {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Assignee</label>
             <select
-              value={form.assignee}
-              onChange={(e) => setForm({ ...form, assignee: e.target.value })}
+              value={form.assignedTo}
+              onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Unassigned</option>
-              {USERS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {members.map((u) => <option key={u._id} value={u._id}>{u.name}</option>)}
             </select>
           </div>
           <div>
@@ -515,10 +651,11 @@ function CreateTaskModal({ open, onClose, projectId, onTaskCreated }) {
           />
         </div>
         <div className="flex gap-3 pt-2 justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors" disabled={loading}>
             Cancel
           </button>
-          <button type="submit" className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+          <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {loading && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             Create Task
           </button>
         </div>
@@ -527,45 +664,100 @@ function CreateTaskModal({ open, onClose, projectId, onTaskCreated }) {
   );
 }
 
-function AddMemberModal({ open, onClose, existingIds, onMemberAdded }) {
+function AddMemberModal({ open, onClose, projectId, onMemberAdded }) {
   const { addToast } = useApp();
   const [search, setSearch] = useState("");
-  const available = USERS.filter(
-    (u) => !existingIds.includes(u.id) && u.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setCandidates([]);
+      return;
+    }
+    
+    const fetchCandidates = async () => {
+      setLoading(true);
+      try {
+        const queryParams = new URLSearchParams();
+        if (search) queryParams.append("search", search);
+        
+        const res = await api.get(`/projects/${projectId}/member-candidates?${queryParams.toString()}`);
+        if (res.data.success) {
+          setCandidates(res.data.data.users);
+        }
+      } catch (err) {
+        console.error("Failed to fetch candidates", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Add a small debounce
+    const timeout = setTimeout(fetchCandidates, 300);
+    return () => clearTimeout(timeout);
+  }, [open, search, projectId]);
+
+  const handleAddMember = async (userId, userName) => {
+    setAddLoading(userId);
+    try {
+      const res = await api.post(`/projects/${projectId}/members`, { userId });
+      if (res.data.success) {
+        addToast("success", `${userName} added to project`);
+        onMemberAdded(res.data.data.members); // The API returns the updated members array
+        onClose();
+      } else {
+        throw new Error(res.data.message || "Failed to add member");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error adding member";
+      addToast("error", msg);
+    } finally {
+      setAddLoading(null);
+    }
+  };
 
   return (
     <Modal open={open} onClose={onClose} title="Add Member">
       <div className="space-y-4">
         <input
           type="text"
-          placeholder="Search users..."
+          placeholder="Search users by name or email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <div className="space-y-2 max-h-64 overflow-y-auto">
-          {available.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">No users found</p>
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+            </div>
+          ) : candidates.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">
+              {search ? "No matching users found" : "Type to search for eligible members"}
+            </p>
           ) : (
-            available.map((u) => (
+            candidates.map((u) => (
               <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full ${u.color} flex items-center justify-center text-white text-xs font-semibold`}>{u.initials}</div>
+                  {u.profileImage ? (
+                    <img src={u.profileImage} alt={u.name} className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <Avatar name={u.name} initials={u.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
+                  )}
                   <div>
                     <div className="text-sm font-medium text-slate-900">{u.name}</div>
                     <div className="text-xs text-slate-500">{u.email}</div>
                   </div>
                 </div>
                 <button
-                  onClick={() => {
-                    onMemberAdded(u.id);
-                    addToast("success", `${u.name} added to project`);
-                    onClose();
-                  }}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
+                  onClick={() => handleAddMember(u.id, u.name)}
+                  disabled={addLoading === u.id}
+                  className="inline-flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50 w-16"
                 >
-                  Add
+                  {addLoading === u.id ? <span className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /> : "Add"}
                 </button>
               </div>
             ))

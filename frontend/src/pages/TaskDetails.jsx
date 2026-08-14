@@ -14,17 +14,17 @@ import { StatusBadge, PriorityBadge, Avatar } from "../components/Badge";
 import { ConfirmDialog } from "../components/Modal";
 import { useApp } from "../context/AppContext";
 
-const CURRENT_USER = {
-  pm: { id: "u1", initials: "AM", color: "bg-blue-600" },
-  member: { id: "u3", initials: "DK", color: "bg-emerald-600" },
-  admin: { id: "u9", initials: "AU", color: "bg-red-600" },
-};
-
 export function TaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToast, role } = useApp();
-  const currentUser = CURRENT_USER[role];
+  const { addToast, user: authUser } = useApp();
+  
+  const currentUser = authUser ? {
+    id: authUser.id || authUser._id,
+    name: authUser.name,
+    initials: authUser.name ? authUser.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "U",
+    color: "bg-blue-600"
+  } : { id: "u1", name: "Unknown", initials: "U", color: "bg-slate-400" };
 
   const task = TASKS.find((t) => t.id === id);
 

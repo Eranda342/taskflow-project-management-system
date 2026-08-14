@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search } from "lucide-react";
 import { Link } from "react-router";
-import { PROJECTS, getUser } from "../data/mockData";
 import { StatusBadge, Avatar } from "../components/Badge";
 import { Modal } from "../components/Modal";
 import { useApp } from "../context/AppContext";
+import api from "../lib/api";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
@@ -20,12 +20,51 @@ export function Projects() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Pagination state (if supported)
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const limit = 10;
 
-  const filtered = PROJECTS.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || p.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams = new URLSearchParams({
+        page,
+        limit,
+      });
+      if (search.trim()) {
+        queryParams.append("search", search.trim());
+      }
+      if (statusFilter !== "all") {
+        queryParams.append("status", statusFilter);
+      }
+
+      const res = await api.get(`/projects?${queryParams.toString()}`);
+      if (res.data.success) {
+        setProjects(res.data.data.projects);
+        setTotalPages(res.data.data.pagination.totalPages);
+        setTotalProjects(res.data.data.pagination.totalProjects);
+      } else {
+        throw new Error(res.data.message || "Failed to load projects");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error loading projects";
+      setError(msg);
+      addToast("error", msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, search, statusFilter, addToast]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -52,13 +91,19 @@ export function Projects() {
               type="text"
               placeholder="Search projects..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1); // Reset to first page on search
+              }}
               className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           >
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -66,111 +111,146 @@ export function Projects() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4 font-medium">Project Name</th>
-                <th className="px-6 py-4 font-medium">Owner</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Members</th>
-                <th className="px-6 py-4 font-medium">Progress</th>
-                <th className="px-6 py-4 font-medium">Deadline</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filtered.length === 0 ? (
+        <div className="overflow-x-auto min-h-[300px]">
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center text-red-500">{error}</div>
+          ) : (
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-slate-500">No projects found.</td>
+                  <th className="px-6 py-4 font-medium">Project Name</th>
+                  <th className="px-6 py-4 font-medium">Owner</th>
+                  <th className="px-6 py-4 font-medium">Status</th>
+                  <th className="px-6 py-4 font-medium">Members</th>
+                  <th className="px-6 py-4 font-medium">Deadline</th>
+                  <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
-              ) : (
-                filtered.map((proj) => {
-                  const owner = getUser(proj.ownerId);
-                  const memberCount = proj.memberIds.length;
-                  return (
-                    <tr key={proj.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <Link to={`/app/projects/${proj.id}`} className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                          {proj.name}
-                        </Link>
-                        <div className="text-xs text-slate-500 mt-0.5 max-w-xs truncate">{proj.description}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-700">
-                        {owner && (
-                          <div className="flex items-center gap-2">
-                            <Avatar name={owner.name} initials={owner.initials} color={owner.color} size="sm" />
-                            {owner.name.split(" ")[0]}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4"><StatusBadge status={proj.status} /></td>
-                      <td className="px-6 py-4 text-slate-600">{memberCount}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-full bg-slate-100 rounded-full h-2 max-w-[100px]">
-                            <div
-                              className={`h-2 rounded-full ${proj.status === "completed" ? "bg-green-500" : "bg-blue-600"}`}
-                              style={{ width: `${proj.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-slate-600">{proj.progress}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium">
-                        {proj.deadline === "TBD" ? "TBD" : new Date(proj.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <Link
-                          to={`/app/projects/${proj.id}`}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {projects.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-16 text-center text-slate-500">No projects found.</td>
+                  </tr>
+                ) : (
+                  projects.map((proj) => {
+                    const owner = proj.owner;
+                    const memberCount = proj.members?.length || 0;
+                    return (
+                      <tr key={proj._id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <Link to={`/app/projects/${proj._id}`} className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            {proj.name}
+                          </Link>
+                          <div className="text-xs text-slate-500 mt-0.5 max-w-xs truncate">{proj.description}</div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-700">
+                          {owner ? (
+                            <div className="flex items-center gap-2">
+                              {owner.profileImage ? (
+                                <img src={owner.profileImage} alt={owner.name} className="w-6 h-6 rounded-full" />
+                              ) : (
+                                <Avatar name={owner.name} initials={owner.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
+                              )}
+                              {owner.name?.split(" ")[0]}
+                            </div>
+                          ) : "Unknown"}
+                        </td>
+                        <td className="px-6 py-4"><StatusBadge status={proj.status} /></td>
+                        <td className="px-6 py-4 text-slate-600">{memberCount}</td>
+                        <td className="px-6 py-4 text-slate-600 font-medium">
+                          {proj.deadline ? new Date(proj.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "None"}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Link
+                            to={`/app/projects/${proj._id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Pagination */}
-        <div className="p-4 border-t border-slate-200 flex items-center justify-between text-sm text-slate-500 bg-slate-50/50">
-          <div>Showing {filtered.length} of {PROJECTS.length} projects</div>
-          <div className="flex gap-1">
-            <button className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors" disabled>Previous</button>
-            <button className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 transition-colors">Next</button>
+        {!loading && projects.length > 0 && (
+          <div className="p-4 border-t border-slate-200 flex items-center justify-between text-sm text-slate-500 bg-slate-50/50">
+            <div>Showing {projects.length} of {totalProjects} projects</div>
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                Previous
+              </button>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1 border border-slate-300 rounded bg-white hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      <CreateProjectModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateProjectModal 
+        open={createOpen} 
+        onClose={() => setCreateOpen(false)} 
+        onProjectCreated={() => {
+          setPage(1);
+          fetchProjects();
+        }}
+      />
     </div>
   );
 }
 
-function CreateProjectModal({ open, onClose }) {
+function CreateProjectModal({ open, onClose, onProjectCreated }) {
   const { addToast } = useApp();
   const [form, setForm] = useState({ name: "", description: "", startDate: "", deadline: "", status: "planning" });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     setLoading(true);
-    setTimeout(() => {
+    setError(null);
+    try {
+      const res = await api.post("/projects", form);
+      if (res.data.success) {
+        addToast("success", "Project created successfully");
+        onProjectCreated();
+        onClose();
+        setForm({ name: "", description: "", startDate: "", deadline: "", status: "planning" });
+      } else {
+        throw new Error(res.data.message || "Failed to create project");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Error creating project";
+      setError(msg);
+      addToast("error", msg);
+    } finally {
       setLoading(false);
-      addToast("success", "Project created successfully");
-      onClose();
-      setForm({ name: "", description: "", startDate: "", deadline: "", status: "planning" });
-    }, 800);
+    }
   };
 
   return (
     <Modal open={open} onClose={onClose} title="Create Project" size="md">
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <div className="p-3 bg-red-50 text-red-600 rounded text-sm">{error}</div>}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Project Name *</label>
           <input
@@ -183,12 +263,13 @@ function CreateProjectModal({ open, onClose }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description *</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Brief description of the project..."
             rows={3}
+            required
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
@@ -225,7 +306,7 @@ function CreateProjectModal({ open, onClose }) {
           </select>
         </div>
         <div className="flex gap-3 pt-2 justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors" disabled={loading}>
             Cancel
           </button>
           <button
