@@ -1,4 +1,6 @@
-import { USERS, PROJECTS, TASKS } from "../../data/mockData";
+import { useState, useEffect } from "react";
+import api from "../../lib/api";
+import { useApp } from "../../context/AppContext";
 
 function DonutChart({ segments, size = 160, label }) {
   const total = segments.reduce((s, seg) => s + seg.value, 0);
@@ -53,62 +55,76 @@ function HBarChart({ bars, maxVal }) {
   );
 }
 
-function LineSparkline({ points, color = "#2563EB" }) {
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  const w = 200;
-  const h = 60;
-  const step = w / (points.length - 1);
-  const pts = points.map((v, i) => `${i * step},${h - ((v - min) / range) * (h - 4) - 2}`).join(" ");
-
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function AdminAnalytics() {
-  const totalUsers = USERS.length;
-  const activeUsers = USERS.filter((u) => u.status === "active").length;
-  const totalProjects = PROJECTS.length;
-  const completedProjects = PROJECTS.filter((p) => p.status === "completed").length;
-  const totalTasks = TASKS.length;
-  const completedTasks = TASKS.filter((t) => t.status === "completed").length;
+  const { addToast } = useApp();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await api.get("/admin/stats");
+        if (res.data.success) {
+          setData(res.data.data);
+        }
+      } catch (error) {
+        addToast("error", error.response?.data?.message || "Failed to load analytics");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStats();
+  }, [addToast]);
+
+  if (loading || !data) {
+    return (
+      <div className="max-w-7xl mx-auto py-24 flex justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  const {
+    usersByRole: rRole,
+    usersByStatus: rUserStatus,
+    projectsByStatus: rProjStatus,
+    tasksByStatus: rTaskStatus,
+    tasksByPriority: rTaskPriority,
+    totals,
+  } = data;
 
   const usersByRole = [
-    { label: "Admin", value: USERS.filter((u) => u.role === "admin").length, color: "#DC2626" },
-    { label: "Project Manager", value: USERS.filter((u) => u.role === "project_manager").length, color: "#2563EB" },
-    { label: "Team Member", value: USERS.filter((u) => u.role === "team_member").length, color: "#16A34A" },
+    { label: "Admin", value: rRole.admin || 0, color: "#DC2626" },
+    { label: "Project Manager", value: rRole.project_manager || 0, color: "#2563EB" },
+    { label: "Team Member", value: rRole.team_member || 0, color: "#16A34A" },
   ];
   const usersByStatus = [
-    { label: "Active", value: activeUsers, color: "#16A34A" },
-    { label: "Inactive", value: totalUsers - activeUsers, color: "#94A3B8" },
+    { label: "Active", value: rUserStatus.active || 0, color: "#16A34A" },
+    { label: "Inactive", value: rUserStatus.inactive || 0, color: "#94A3B8" },
   ];
   const projectsByStatus = [
-    { label: "Active", value: PROJECTS.filter((p) => p.status === "active").length, color: "#2563EB" },
-    { label: "Review", value: PROJECTS.filter((p) => p.status === "review").length, color: "#D97706" },
-    { label: "Planning", value: PROJECTS.filter((p) => p.status === "planning").length, color: "#64748B" },
-    { label: "On Hold", value: PROJECTS.filter((p) => p.status === "on_hold").length, color: "#94A3B8" },
-    { label: "Completed", value: completedProjects, color: "#16A34A" },
+    { label: "Active", value: rProjStatus.active || 0, color: "#2563EB" },
+    { label: "Review", value: rProjStatus.review || 0, color: "#D97706" },
+    { label: "Planning", value: rProjStatus.planning || 0, color: "#64748B" },
+    { label: "On Hold", value: rProjStatus.on_hold || 0, color: "#94A3B8" },
+    { label: "Completed", value: rProjStatus.completed || 0, color: "#16A34A" },
   ];
   const tasksByStatus = [
-    { label: "To Do", value: TASKS.filter((t) => t.status === "todo").length, color: "#64748B" },
-    { label: "In Progress", value: TASKS.filter((t) => t.status === "in_progress").length, color: "#2563EB" },
-    { label: "Review", value: TASKS.filter((t) => t.status === "review").length, color: "#D97706" },
-    { label: "Completed", value: completedTasks, color: "#16A34A" },
+    { label: "To Do", value: rTaskStatus.todo || 0, color: "#64748B" },
+    { label: "In Progress", value: rTaskStatus.in_progress || 0, color: "#2563EB" },
+    { label: "Review", value: rTaskStatus.review || 0, color: "#D97706" },
+    { label: "Completed", value: rTaskStatus.completed || 0, color: "#16A34A" },
   ];
   const tasksByPriority = [
-    { label: "Urgent", value: TASKS.filter((t) => t.priority === "urgent").length, color: "#DC2626" },
-    { label: "High", value: TASKS.filter((t) => t.priority === "high").length, color: "#D97706" },
-    { label: "Medium", value: TASKS.filter((t) => t.priority === "medium").length, color: "#2563EB" },
-    { label: "Low", value: TASKS.filter((t) => t.priority === "low").length, color: "#64748B" },
+    { label: "Urgent", value: rTaskPriority.urgent || 0, color: "#DC2626" },
+    { label: "High", value: rTaskPriority.high || 0, color: "#D97706" },
+    { label: "Medium", value: rTaskPriority.medium || 0, color: "#2563EB" },
+    { label: "Low", value: rTaskPriority.low || 0, color: "#64748B" },
   ];
 
-  // Mock weekly task completion trend
-  const weeklyTrend = [2, 5, 3, 7, 4, 6, 8, 5, 9, 7, 11, 8];
-  const weeklyUsers = [12, 13, 14, 13, 15, 15, 16, 17, 17, 18, 18, 19];
+  const completionRate = totals.tasks > 0 
+    ? Math.round((rTaskStatus.completed / totals.tasks) * 100) 
+    : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -120,12 +136,12 @@ export function AdminAnalytics() {
       {/* KPI Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: "Total Users", value: totalUsers, sub: `${activeUsers} active`, color: "text-blue-600" },
-          { label: "Inactive Users", value: totalUsers - activeUsers, sub: "need attention", color: "text-amber-600" },
-          { label: "Total Projects", value: totalProjects, sub: `${completedProjects} completed`, color: "text-indigo-600" },
-          { label: "Total Tasks", value: totalTasks, sub: `${completedTasks} done`, color: "text-violet-600" },
-          { label: "Completion Rate", value: `${Math.round((completedTasks / totalTasks) * 100)}%`, sub: "tasks done", color: "text-emerald-600" },
-          { label: "Overdue Tasks", value: TASKS.filter((t) => t.status !== "completed" && new Date(t.dueDate) < new Date("2026-08-12")).length, sub: "need action", color: "text-red-600" },
+          { label: "Total Users", value: totals.users, sub: `${rUserStatus.active || 0} active`, color: "text-blue-600" },
+          { label: "Inactive Users", value: rUserStatus.inactive || 0, sub: "need attention", color: "text-amber-600" },
+          { label: "Total Projects", value: totals.projects, sub: `${rProjStatus.completed || 0} completed`, color: "text-indigo-600" },
+          { label: "Total Tasks", value: totals.tasks, sub: `${rTaskStatus.completed || 0} done`, color: "text-violet-600" },
+          { label: "Completion Rate", value: `${completionRate}%`, sub: "tasks done", color: "text-emerald-600" },
+          { label: "Total Comments", value: totals.comments || 0, sub: "platform wide", color: "text-slate-600" },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
             <div className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</div>
@@ -133,37 +149,6 @@ export function AdminAnalytics() {
             <div className="text-xs text-slate-400 mt-0.5">{kpi.sub}</div>
           </div>
         ))}
-      </div>
-
-      {/* Trend charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">Task Completions</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Last 12 weeks</p>
-            </div>
-            <span className="text-lg font-bold text-emerald-600">↑ 23%</span>
-          </div>
-          <LineSparkline points={weeklyTrend} color="#2563EB" />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>12w ago</span><span>Now</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-900">Active Users</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Last 12 weeks</p>
-            </div>
-            <span className="text-lg font-bold text-emerald-600">↑ 58%</span>
-          </div>
-          <LineSparkline points={weeklyUsers} color="#16A34A" />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>12w ago</span><span>Now</span>
-          </div>
-        </div>
       </div>
 
       {/* Distribution charts */}
@@ -183,60 +168,12 @@ export function AdminAnalytics() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
           <div>
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Tasks by Status</h3>
-            <HBarChart bars={tasksByStatus} maxVal={totalTasks} />
+            <HBarChart bars={tasksByStatus} maxVal={totals.tasks} />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Tasks by Priority</h3>
-            <HBarChart bars={tasksByPriority} maxVal={totalTasks} />
+            <HBarChart bars={tasksByPriority} maxVal={totals.tasks} />
           </div>
-        </div>
-      </div>
-
-      {/* Project progress table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900">Project Progress Overview</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-3 font-medium">Project</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Members</th>
-                <th className="px-6 py-3 font-medium">Tasks</th>
-                <th className="px-6 py-3 font-medium">Progress</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {PROJECTS.map((proj) => (
-                <tr key={proj.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-slate-900">{proj.name}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
-                      proj.status === "active" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      proj.status === "completed" ? "bg-green-50 text-green-700 border-green-200" :
-                      proj.status === "review" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                      "bg-slate-100 text-slate-700 border-slate-200"
-                    }`}>{proj.status}</span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">{proj.memberIds.length}</td>
-                  <td className="px-6 py-4 text-slate-600">{proj.tasksCompleted}/{proj.tasksTotal}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 bg-slate-100 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${proj.status === "completed" ? "bg-green-500" : "bg-blue-600"}`}
-                          style={{ width: `${proj.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-slate-600 w-8">{proj.progress}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -256,7 +193,7 @@ function ChartCard({ title, segments, children }) {
               <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: seg.color }} />
               <span className="text-slate-600">{seg.label}</span>
             </div>
-            <span className="font-semibold text-slate-800">{seg.value} <span className="text-slate-400 font-normal">({Math.round((seg.value / total) * 100)}%)</span></span>
+            <span className="font-semibold text-slate-800">{seg.value} <span className="text-slate-400 font-normal">({total > 0 ? Math.round((seg.value / total) * 100) : 0}%)</span></span>
           </div>
         ))}
       </div>

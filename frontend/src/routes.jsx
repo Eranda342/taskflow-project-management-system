@@ -48,6 +48,13 @@ function PublicAuthRoute({ children }) {
   return children;
 }
 
+function AdminRoute({ children }) {
+  const { user, authLoading } = useApp();
+  if (authLoading) return <FullScreenSpinner />;
+  if (!user || user.role !== "admin") return <Navigate to="/403" replace />;
+  return children;
+}
+
 export const router = createBrowserRouter([
   /* Public landing page */
   {
@@ -83,7 +90,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/app/dashboard" replace /> },
       { path: "dashboard", Component: Dashboard },
       { path: "team-dashboard", Component: TeamDashboard },
-      { path: "admin", Component: AdminDashboard },
+      { path: "admin", element: <AdminRoute><AdminDashboard /></AdminRoute> },
       { path: "projects", Component: Projects },
       { path: "projects/:id", Component: ProjectDetails },
       { path: "tasks", Component: Tasks },
@@ -92,10 +99,10 @@ export const router = createBrowserRouter([
       { path: "notifications", Component: Notifications },
       { path: "profile", Component: Profile },
       { path: "settings", Component: Settings },
-      { path: "admin/users", Component: AdminUsers },
-      { path: "admin/users/:userId", Component: AdminUserDetails },
-      { path: "admin/projects", Component: AdminProjects },
-      { path: "admin/analytics", Component: AdminAnalytics },
+      { path: "admin/users", element: <AdminRoute><AdminUsers /></AdminRoute> },
+      { path: "admin/users/:userId", element: <AdminRoute><AdminUserDetails /></AdminRoute> },
+      { path: "admin/projects", element: <AdminRoute><AdminProjects /></AdminRoute> },
+      { path: "admin/analytics", element: <AdminRoute><AdminAnalytics /></AdminRoute> },
     ],
   },
 

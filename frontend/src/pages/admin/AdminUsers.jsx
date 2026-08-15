@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import { Search, ChevronDown } from "lucide-react";
-import { USERS, formatDate } from "../../data/mockData";
 import { Avatar } from "../../components/Badge";
 import { ConfirmDialog } from "../../components/Modal";
 import { useApp } from "../../context/AppContext";
+import api from "../../lib/api";
 
 const ROLE_LABELS = {
   admin: "Admin",
@@ -20,28 +20,68 @@ export function AdminUsers() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(null);
   const [confirmRoleChange, setConfirmRoleChange] = useState(null);
   const [openMenu, setOpenMenu] = useState(null);
-  const [localUsers, setLocalUsers] = useState(USERS);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const filtered = localUsers.filter((u) => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === "all" || u.role === roleFilter;
-    const matchStatus = statusFilter === "all" || u.status === statusFilter;
-    return matchSearch && matchRole && matchStatus;
-  });
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (search) params.search = search;
+      if (roleFilter !== "all") params.role = roleFilter;
+      if (statusFilter !== "all") params.status = statusFilter;
+      
+      const { data } = await api.get("/users", { params });
+      if (data.success) {
+        setUsers(data.data.users);
+      }
+    } catch (error) {
+      addToast("error", error.response?.data?.message || "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, roleFilter, statusFilter, addToast]);
 
-  const toggleStatus = (user) => {
-    setLocalUsers((prev) =>
-      prev.map((u) => u.id === user.id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u)
-    );
-    addToast("success", `${user.name} ${user.status === "active" ? "deactivated" : "activated"}`);
+  useEffect(() => {
+    // Add a slight debounce for searching
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchUsers]);
+
+  const toggleStatus = async (user) => {
+    setActionLoading(true);
+    try {
+      const newStatus = user.status === "active" ? "inactive" : "active";
+      await api.patch(`/users/${user.id}/status`, { status: newStatus });
+      addToast("success", `${user.name} has been ${newStatus === "active" ? "activated" : "deactivated"}`);
+      fetchUsers();
+    } catch (error) {
+      addToast("error", error.response?.data?.message || "Failed to update user status");
+    } finally {
+      setActionLoading(false);
+      setConfirmDeactivate(null);
+    }
   };
 
-  const changeRole = (userId, role) => {
-    setLocalUsers((prev) =>
-      prev.map((u) => u.id === userId ? { ...u, role: role } : u)
-    );
-    addToast("success", "User role updated");
-    setConfirmRoleChange(null);
+  const changeRole = async (userId, role) => {
+    setActionLoading(true);
+    try {
+      await api.patch(`/users/${userId}/role`, { role });
+      addToast("success", "User role updated successfully");
+      fetchUsers();
+    } catch (error) {
+      addToast("error", error.response?.data?.message || "Failed to update user role");
+    } finally {
+      setActionLoading(false);
+      setConfirmRoleChange(null);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
   return (
@@ -49,7 +89,7 @@ export function AdminUsers() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">User Management</h2>
-          <p className="text-slate-500 mt-1">{localUsers.length} total users on the platform.</p>
+          <p className="text-slate-500 mt-1">Manage users on the platform.</p>
         </div>
         <button onClick={() => addToast("info", "Invite user — coming soon")} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
           Invite User
@@ -82,7 +122,12 @@ export function AdminUsers() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+            <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
@@ -95,11 +140,11 @@ export function AdminUsers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((user) => (
+              {users.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4">
                     <Link to={`/app/admin/users/${user.id}`} className="flex items-center gap-3">
-                      <Avatar name={user.name} initials={user.initials} color={user.color} size="sm" />
+                      <Avatar name={user.name} initials={user.profileImage ? null : undefined} color="bg-blue-600" size="sm" />
                       <div>
                         <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{user.name}</div>
                         <div className="text-xs text-slate-500">{user.email}</div>
@@ -110,7 +155,8 @@ export function AdminUsers() {
                     <div className="relative inline-block">
                       <button
                         onClick={() => setOpenMenu(openMenu === user.id ? null : user.id)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                        disabled={actionLoading}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 ${
                           user.role === "admin" ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" :
                           user.role === "project_manager" ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" :
                           "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
@@ -124,15 +170,17 @@ export function AdminUsers() {
                           <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />
                           <div className="absolute left-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
                             {[
-                              { value: "admin", label: "Admin", warn: true },
-                              { value: "project_manager", label: "Project Manager", warn: false },
-                              { value: "team_member", label: "Team Member", warn: false },
+                              { value: "admin", label: "Admin" },
+                              { value: "project_manager", label: "Project Manager" },
+                              { value: "team_member", label: "Team Member" },
                             ].map((opt) => (
                               <button
                                 key={opt.value}
                                 onClick={() => {
                                   setOpenMenu(null);
-                                  setConfirmRoleChange({ user, role: opt.value });
+                                  if (opt.value !== user.role) {
+                                    setConfirmRoleChange({ user, role: opt.value });
+                                  }
                                 }}
                                 className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                                   user.role === opt.value
@@ -168,7 +216,8 @@ export function AdminUsers() {
                       {user.role !== "admin" && (
                         <button
                           onClick={() => setConfirmDeactivate(user)}
-                          className={`text-sm font-medium transition-colors ${
+                          disabled={actionLoading}
+                          className={`text-sm font-medium transition-colors disabled:opacity-50 ${
                             user.status === "active" ? "text-slate-500 hover:text-red-600" : "text-green-600 hover:text-green-700"
                           }`}
                         >
@@ -181,32 +230,34 @@ export function AdminUsers() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          {!loading && users.length === 0 && (
             <div className="text-center py-12 text-slate-500 text-sm">No users found.</div>
           )}
         </div>
         <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex items-center justify-between text-sm text-slate-500">
-          <span>Showing {filtered.length} of {localUsers.length} users</span>
+          <span>Showing {users.length} users</span>
         </div>
       </div>
 
       <ConfirmDialog
         open={!!confirmDeactivate}
-        onClose={() => setConfirmDeactivate(null)}
-        onConfirm={() => { if (confirmDeactivate) toggleStatus(confirmDeactivate); setConfirmDeactivate(null); }}
+        onClose={() => !actionLoading && setConfirmDeactivate(null)}
+        onConfirm={() => { if (confirmDeactivate) toggleStatus(confirmDeactivate); }}
         title={confirmDeactivate?.status === "active" ? "Deactivate User" : "Activate User"}
         description={`Are you sure you want to ${confirmDeactivate?.status === "active" ? "deactivate" : "activate"} ${confirmDeactivate?.name}?`}
         confirmLabel={confirmDeactivate?.status === "active" ? "Deactivate" : "Activate"}
         danger={confirmDeactivate?.status === "active"}
+        loading={actionLoading}
       />
 
       <ConfirmDialog
         open={!!confirmRoleChange}
-        onClose={() => setConfirmRoleChange(null)}
+        onClose={() => !actionLoading && setConfirmRoleChange(null)}
         onConfirm={() => { if (confirmRoleChange) changeRole(confirmRoleChange.user.id, confirmRoleChange.role); }}
         title="Change User Role"
         description={`Change ${confirmRoleChange?.user.name}'s role to ${confirmRoleChange ? ROLE_LABELS[confirmRoleChange.role] : ""}?`}
         confirmLabel="Confirm Role Change"
+        loading={actionLoading}
       />
     </div>
   );
