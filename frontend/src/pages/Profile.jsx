@@ -1,29 +1,34 @@
 import { useState } from "react";
 import { Camera, Save } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { USERS } from "../data/mockData";
+import api from "../lib/api";
 
 export function Profile() {
-  const { user: authUser, addToast } = useApp();
+  const { user: authUser, addToast, refreshUser } = useApp();
   
-  // Use auth user data, fallback to mock data only for rendering missing fields (like color) until Phase 7
+  // Use auth user data, fallback to basic defaults for rendering if strictly missing
   const user = authUser ? {
     ...authUser,
     initials: authUser.name ? authUser.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "U",
     color: "bg-blue-600",
     createdAt: authUser.createdAt || new Date().toISOString()
-  } : USERS[0];
+  } : { name: "", email: "", role: "team_member", color: "bg-blue-600", initials: "U" };
 
   const [form, setForm] = useState({ name: user.name || "", email: user.email || "" });
   const [saving, setSaving] = useState(false);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await api.patch('/users/me/profile', { name: form.name });
+      await refreshUser();
       addToast("success", "Profile updated successfully");
-    }, 800);
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -76,7 +81,7 @@ export function Profile() {
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             />
           </div>
           <div>
@@ -84,8 +89,8 @@ export function Profile() {
             <input
               type="email"
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
             />
           </div>
           <div>
@@ -98,18 +103,12 @@ export function Profile() {
             />
             <p className="text-xs text-slate-400 mt-1">Role is managed by your administrator.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Account Status</label>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-sm font-medium text-green-700">Active</span>
-            </div>
-          </div>
-          <div className="pt-2 flex justify-end">
+          
+          <div className="pt-4 flex justify-end">
             <button
               type="submit"
-              disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              disabled={saving || !form.name.trim() || form.name === user.name}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? (
                 <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
