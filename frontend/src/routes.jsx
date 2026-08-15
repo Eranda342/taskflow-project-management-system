@@ -22,8 +22,6 @@ import { Forbidden } from "./pages/Forbidden";
 import { ServerError } from "./pages/ServerError";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
-import { ForgotPassword } from "./pages/ForgotPassword";
-import { ResetPassword } from "./pages/ResetPassword";
 import { useApp } from "./context/AppContext";
 
 function FullScreenSpinner() {
@@ -73,8 +71,6 @@ export const router = createBrowserRouter([
     children: [
       { path: "login", Component: Login },
       { path: "register", Component: Register },
-      { path: "forgot-password", Component: ForgotPassword },
-      { path: "reset-password", Component: ResetPassword },
     ],
   },
 

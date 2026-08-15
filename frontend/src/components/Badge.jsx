@@ -1,4 +1,20 @@
-import { getStatusLabel, getPriorityLabel } from "../data/mockData";
+export function getStatusLabel(status) {
+  const map = {
+    todo: "To Do",
+    in_progress: "In Progress",
+    review: "Review",
+    completed: "Completed",
+    planning: "Planning",
+    active: "Active",
+    on_hold: "On Hold",
+  };
+  return map[status] ?? status;
+}
+
+export function getPriorityLabel(priority) {
+  if (!priority) return "";
+  return priority.charAt(0).toUpperCase() + priority.slice(1);
+}
 
 export function StatusBadge({ status }) {
   const config = {
