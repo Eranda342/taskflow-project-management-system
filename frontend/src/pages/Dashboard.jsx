@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { Link } from "react-router";
 import { StatusBadge, PriorityBadge } from "../components/Badge";
+import CreateProjectModal from "../components/CreateProjectModal";
 import { useApp } from "../context/AppContext";
 import api from "../lib/api";
 
@@ -11,10 +13,10 @@ export function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
+  const fetchDashboard = useCallback(async () => {
+    try {
         const res = await api.get("/dashboard");
         if (res.data.success) {
           setData(res.data.data);
@@ -26,11 +28,13 @@ export function Dashboard() {
         setError(msg);
         addToast("error", msg);
       } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboard();
+      setLoading(false);
+    }
   }, [addToast]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
@@ -75,7 +79,7 @@ export function Dashboard() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => addToast("info", "Create project modal — see Projects page")}
+            onClick={() => setCreateOpen(true)}
             className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             + New Project
@@ -221,6 +225,12 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      <CreateProjectModal 
+        open={createOpen} 
+        onClose={() => setCreateOpen(false)} 
+        onProjectCreated={() => fetchDashboard()} 
+      />
     </div>
   );
 }

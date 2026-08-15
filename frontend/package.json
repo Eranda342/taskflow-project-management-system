@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt"
@@ -23,6 +23,7 @@
     "react-hook-form": "^7.85.0",
     "react-router": "^8.3.0",
     "recharts": "^3.10.1",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   ChevronRight,
@@ -9,10 +9,27 @@ import {
   Trash2,
   AlertCircle,
 } from "lucide-react";
-import { TASKS, getUser, getProject, getTaskComments, formatDate, timeAgo } from "../data/mockData";
+import api from "../lib/api";
+import { getSocket } from "../lib/socket";
 import { StatusBadge, PriorityBadge, Avatar } from "../components/Badge";
-import { ConfirmDialog } from "../components/Modal";
+import { Modal, ConfirmDialog } from "../components/Modal";
 import { useApp } from "../context/AppContext";
+
+function formatDate(dateString) {
+  if (!dateString) return "—";
+  return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  const diff = Date.now() - new Date(dateString).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export function TaskDetails() {
   const { id } = useParams();
@@ -26,18 +43,73 @@ export function TaskDetails() {
     color: "bg-blue-600"
   } : { id: "u1", name: "Unknown", initials: "U", color: "bg-slate-400" };
 
-  const task = TASKS.find((t) => t.id === id);
-
+  const [task, setTask] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState([]);
+  
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteCommentId, setDeleteCommentId] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState("");
   const [newComment, setNewComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // Unified comment list: seeded from mock data, all mutations applied here
-  const [comments, setComments] = useState(() => task ? getTaskComments(task.id) : []);
-  const [statusOverride, setStatusOverride] = useState(null);
-  const [priorityOverride, setPriorityOverride] = useState(null);
+  
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [selectedAssignee, setSelectedAssignee] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState(null);
+
+  const fetchTaskAndComments = async () => {
+    try {
+      const [{ data: taskData }, { data: commentsData }] = await Promise.all([
+        api.get(`/tasks/${id}`),
+        api.get(`/tasks/${id}/comments`).catch(() => ({ data: { data: { comments: [] } } }))
+      ]);
+      setTask(taskData.data.task);
+      setComments(commentsData.data.comments || []);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setTask(null);
+      } else {
+        addToast("error", "Failed to load task details");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTaskAndComments();
+  }, [id]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !task?._id) return;
+
+    const handleTaskUpdated = (data) => {
+      if (data.task && data.task._id === task._id) {
+        setTask(data.task);
+      }
+    };
+    
+    socket.on("task:updated", handleTaskUpdated);
+    
+    return () => {
+      socket.off("task:updated", handleTaskUpdated);
+    };
+  }, [task?._id]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-24 text-blue-600">
+        <svg className="animate-spin h-8 w-8" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    );
+  }
 
   if (!task) {
     return (
@@ -48,46 +120,110 @@ export function TaskDetails() {
     );
   }
 
-  const project = getProject(task.projectId);
-  const assignee = getUser(task.assigneeId);
-  const createdBy = getUser(task.createdById);
-  const currentStatus = statusOverride ?? task.status;
-  const currentPriority = priorityOverride ?? task.priority;
+  const project = task.project;
+  const assignee = task.assignedTo;
+  const createdBy = task.createdBy;
+  const currentStatus = task.status;
+  const currentPriority = task.priority;
 
-  const isOverdue = currentStatus !== "completed" && new Date(task.dueDate) < new Date("2026-08-12");
+  const isOverdue = currentStatus !== "completed" && task.dueDate && new Date(task.dueDate) < new Date();
 
-  const handleSubmitComment = (e) => {
+  // Mutations
+  const updateStatus = async (status) => {
+    try {
+      const { data } = await api.patch(`/tasks/${task._id}/status`, { status });
+      setTask(data.data.task);
+      addToast("success", "Status updated");
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to update status");
+    }
+  };
+
+  const updatePriority = async (priority) => {
+    try {
+      const { data } = await api.patch(`/tasks/${task._id}`, { priority });
+      setTask(data.data.task);
+      addToast("success", "Priority updated");
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to update priority");
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    try {
+      await api.delete(`/tasks/${task._id}`);
+      addToast("success", "Task deleted");
+      navigate(project ? `/app/projects/${project._id}` : "/app/tasks");
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to delete task");
+    }
+    setDeleteOpen(false);
+  };
+
+  const loadProjectMembers = async () => {
+    if (!project) return;
+    try {
+      const { data } = await api.get(`/projects/${project._id}/members`);
+      setProjectMembers(data.data.members || []);
+      setSelectedAssignee(assignee ? assignee._id : "");
+      setAssignError(null);
+      setAssignOpen(true);
+    } catch (err) {
+      addToast("error", "Failed to load project members");
+    }
+  };
+
+  const handleAssign = async () => {
+    setAssignLoading(true);
+    setAssignError(null);
+    try {
+      const { data } = await api.patch(`/tasks/${task._id}/assign`, { userId: selectedAssignee || null });
+      setTask(data.data.task);
+      addToast("success", "Assignee updated");
+      setAssignOpen(false);
+    } catch (err) {
+      setAssignError(err.response?.data?.message || "Failed to update assignee");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
     setSubmitting(true);
-    setTimeout(() => {
-      const comment = {
-        id: `lc-${Date.now()}`,
-        taskId: task.id,
-        authorId: currentUser.id,
-        content: newComment,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setComments((prev) => [...prev, comment]);
+    try {
+      const { data } = await api.post(`/tasks/${task._id}/comments`, { message: newComment });
+      setComments((prev) => [...prev, data.data.comment]);
       setNewComment("");
-      setSubmitting(false);
       addToast("success", "Comment added");
-    }, 600);
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to add comment");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSaveEdit = (commentId) => {
-    setComments((prev) => prev.map((c) =>
-      c.id === commentId ? { ...c, content: editCommentText, updatedAt: new Date().toISOString() } : c
-    ));
-    setEditingCommentId(null);
-    addToast("success", "Comment updated");
+  const handleSaveEdit = async (commentId) => {
+    try {
+      const { data } = await api.patch(`/comments/${commentId}`, { message: editCommentText });
+      setComments((prev) => prev.map((c) => (c._id === commentId ? data.data.comment : c)));
+      setEditingCommentId(null);
+      addToast("success", "Comment updated");
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to update comment");
+    }
   };
 
-  const handleDeleteComment = (commentId) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await api.delete(`/comments/${commentId}`);
+      setComments((prev) => prev.filter((c) => c._id !== commentId));
+      addToast("success", "Comment deleted");
+    } catch (err) {
+      addToast("error", "Failed to delete comment");
+    }
     setDeleteCommentId(null);
-    addToast("success", "Comment deleted");
   };
 
   return (
@@ -98,7 +234,7 @@ export function TaskDetails() {
           <>
             <Link to="/app/projects" className="hover:text-blue-600 transition-colors">Projects</Link>
             <ChevronRight className="w-4 h-4" />
-            <Link to={`/app/projects/${project.id}`} className="hover:text-blue-600 transition-colors">{project.name}</Link>
+            <Link to={`/app/projects/${project._id}`} className="hover:text-blue-600 transition-colors">{project.name}</Link>
             <ChevronRight className="w-4 h-4" />
           </>
         )}
@@ -126,12 +262,6 @@ export function TaskDetails() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => addToast("info", "Edit task coming soon")}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
                   onClick={() => setDeleteOpen(true)}
                   className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
@@ -139,7 +269,7 @@ export function TaskDetails() {
                 </button>
               </div>
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed">{task.description}</p>
+            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{task.description || "No description provided."}</p>
           </div>
 
           {/* Quick actions */}
@@ -150,8 +280,9 @@ export function TaskDetails() {
                 <label className="block text-xs font-medium text-slate-500 mb-2">Status</label>
                 <select
                   value={currentStatus}
-                  onChange={(e) => { setStatusOverride(e.target.value); addToast("success", "Status updated"); }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => updateStatus(e.target.value)}
+                  disabled={!(authUser?.role === "admin" || authUser?.role === "project_manager" || (assignee && (assignee._id === currentUser.id || assignee.id === currentUser.id)))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
                 >
                   <option value="todo">To Do</option>
                   <option value="in_progress">In Progress</option>
@@ -163,8 +294,9 @@ export function TaskDetails() {
                 <label className="block text-xs font-medium text-slate-500 mb-2">Priority</label>
                 <select
                   value={currentPriority}
-                  onChange={(e) => { setPriorityOverride(e.target.value); addToast("success", "Priority updated"); }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => updatePriority(e.target.value)}
+                  disabled={!(authUser?.role === "admin" || authUser?.role === "project_manager")}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -184,39 +316,49 @@ export function TaskDetails() {
               </h3>
             </div>
 
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
               {comments.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500">
                   No comments yet. Be the first to comment.
                 </div>
               ) : (
                 comments.map((comment) => {
-                  const author = getUser(comment.authorId);
-                  const isEditing = editingCommentId === comment.id;
+                  const author = comment.user || comment.author;
+                  const isEditing = editingCommentId === comment._id;
+                  const authorInitials = author?.name ? author.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "U";
                   return (
-                    <div key={comment.id} className="p-6">
+                    <div key={comment._id} className="p-6">
                       <div className="flex items-start gap-3">
-                        {author && <Avatar name={author.name} initials={author.initials} color={author.color} size="sm" />}
+                        <Avatar name={author?.name} initials={authorInitials} color="bg-slate-400" size="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-slate-900">{author?.name ?? "Unknown"}</span>
+                              <span className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+                                {author?.name ?? "Unknown"}
+                                {author?.role === 'project_manager' && (
+                                  <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                                )}
+                              </span>
                               <span className="text-xs text-slate-400">{timeAgo(comment.createdAt)}</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => { setEditingCommentId(comment.id); setEditCommentText(comment.content); }}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteCommentId(comment.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            {(currentUser.id === author?._id || authUser?.role === "admin") && (
+                              <div className="flex items-center gap-1">
+                                {currentUser.id === author?._id && (
+                                  <button
+                                    onClick={() => { setEditingCommentId(comment._id); setEditCommentText(comment.message); }}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setDeleteCommentId(comment._id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                           {isEditing ? (
                             <div className="space-y-2">
@@ -228,7 +370,7 @@ export function TaskDetails() {
                               />
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => handleSaveEdit(comment.id)}
+                                  onClick={() => handleSaveEdit(comment._id)}
                                   className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                   Save
@@ -242,7 +384,7 @@ export function TaskDetails() {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-sm text-slate-700 leading-relaxed">{comment.content}</p>
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{comment.message}</p>
                           )}
                         </div>
                       </div>
@@ -300,7 +442,7 @@ export function TaskDetails() {
             <DetailRow label="Priority"><PriorityBadge priority={currentPriority} /></DetailRow>
             <DetailRow label="Project">
               {project ? (
-                <Link to={`/app/projects/${project.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                <Link to={`/app/projects/${project._id}`} className="text-sm font-medium text-blue-600 hover:text-blue-700">
                   {project.name}
                 </Link>
               ) : (
@@ -310,8 +452,13 @@ export function TaskDetails() {
             <DetailRow label="Assignee">
               {assignee ? (
                 <div className="flex items-center gap-2">
-                  <Avatar name={assignee.name} initials={assignee.initials} color={assignee.color} size="sm" />
-                  <span className="text-sm font-medium text-slate-900">{assignee.name}</span>
+                  <Avatar name={assignee.name} initials={assignee.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2)} color="bg-slate-400" size="sm" />
+                  <span className="text-sm font-medium text-slate-900 flex items-center gap-1.5">
+                    {assignee.name}
+                    {assignee.role === 'project_manager' && (
+                      <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                    )}
+                  </span>
                 </div>
               ) : (
                 <span className="text-sm text-slate-500">Unassigned</span>
@@ -320,8 +467,13 @@ export function TaskDetails() {
             <DetailRow label="Created by">
               {createdBy ? (
                 <div className="flex items-center gap-2">
-                  <Avatar name={createdBy.name} initials={createdBy.initials} color={createdBy.color} size="sm" />
-                  <span className="text-sm font-medium text-slate-900">{createdBy.name}</span>
+                  <Avatar name={createdBy.name} initials={createdBy.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2)} color="bg-slate-400" size="sm" />
+                  <span className="text-sm font-medium text-slate-900 flex items-center gap-1.5">
+                    {createdBy.name}
+                    {createdBy.role === 'project_manager' && (
+                      <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                    )}
+                  </span>
                 </div>
               ) : (
                 <span className="text-sm text-slate-500">—</span>
@@ -340,20 +492,22 @@ export function TaskDetails() {
             </DetailRow>
           </div>
 
-          <button
-            onClick={() => addToast("success", `Task assigned to ${assignee?.name ?? "team member"}`)}
-            className="w-full py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
-          >
-            <User className="w-4 h-4" />
-            Change Assignee
-          </button>
+          {(authUser?.role === "admin" || authUser?.role === "project_manager") && (
+            <button
+              onClick={loadProjectMembers}
+              className="w-full py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <User className="w-4 h-4" />
+              Change Assignee
+            </button>
+          )}
         </div>
       </div>
 
       <ConfirmDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        onConfirm={() => { addToast("success", "Task deleted"); navigate(project ? `/app/projects/${project.id}` : "/app/tasks"); }}
+        onConfirm={handleDeleteTask}
         title="Delete Task"
         description={`Are you sure you want to delete "${task.title}"? This cannot be undone.`}
         confirmLabel="Delete Task"
@@ -362,12 +516,94 @@ export function TaskDetails() {
       <ConfirmDialog
         open={!!deleteCommentId}
         onClose={() => setDeleteCommentId(null)}
-        onConfirm={() => { if (deleteCommentId) handleDeleteComment(deleteCommentId); }}
+        onConfirm={() => handleDeleteComment(deleteCommentId)}
         title="Delete Comment"
         description="Are you sure you want to delete this comment?"
         confirmLabel="Delete"
         danger
       />
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Change Assignee" size="md">
+        <div className="space-y-4">
+          {assignError && (
+            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {assignError}
+            </div>
+          )}
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            <div
+              onClick={() => setSelectedAssignee("")}
+              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                !selectedAssignee ? "border-blue-600 bg-blue-50" : "border-slate-100 hover:border-blue-200"
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-slate-900">Unassigned</div>
+                <div className="text-xs text-slate-500">Remove current assignee</div>
+              </div>
+            </div>
+
+            {projectMembers.map((m) => {
+              const u = m.user || m;
+              if (!u) return null;
+              const userId = u._id || u.id;
+              const isSelected = selectedAssignee === userId;
+              return (
+                <div
+                  key={userId}
+                  onClick={() => setSelectedAssignee(userId)}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    isSelected ? "border-blue-600 bg-blue-50" : "border-slate-100 hover:border-blue-200"
+                  }`}
+                >
+                  {u.profileImage ? (
+                    <img src={u.profileImage} alt={u.name} className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <Avatar name={u.name} initials={u.name?.[0]} color="bg-slate-200 text-slate-700" size="sm" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 flex items-center gap-2 truncate">
+                      {u.name}
+                      {u.role === 'project_manager' && (
+                        <span className="shrink-0 text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">
+                          PM
+                        </span>
+                      )}
+                      {assignee && (assignee._id === userId || assignee.id === userId) && (
+                        <span className="shrink-0 text-[10px] uppercase font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate">{u.email}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => setAssignOpen(false)}
+              disabled={assignLoading}
+              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAssign}
+              disabled={assignLoading}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {assignLoading && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+              {selectedAssignee ? "Assign" : "Unassign"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

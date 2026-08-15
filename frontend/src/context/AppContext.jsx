@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import api from "../lib/api";
 import { getToken, setToken, removeToken, isAuthenticated } from "../lib/auth";
+import { initSocket, disconnectSocket } from "../lib/socket";
 
 const AppContext = createContext(null);
 
@@ -10,9 +11,9 @@ export function AppProvider({ children }) {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Existing mock state to be replaced later
+  // Existing state
   const [toasts, setToasts] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(3);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const addToast = useCallback((type, message) => {
     const id = Date.now().toString();
@@ -26,6 +27,32 @@ export function AppProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const { data } = await api.get("/notifications/unread-count");
+      if (data.success && data.data) {
+        setUnreadCount(data.data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread notifications count", error);
+    }
+  }, []);
+
+  const setupSocket = useCallback(() => {
+    const socket = initSocket();
+    if (!socket) return;
+    
+    // Prevent duplicate listeners
+    socket.off("notification:new");
+    
+    socket.on("notification:new", (notification) => {
+      setUnreadCount((prev) => prev + 1);
+      
+      // Optionally show a toast for real-time notification
+      addToast("info", notification.message || "New notification received");
+    });
+  }, [addToast]);
+
   const refreshUser = useCallback(async () => {
     try {
       if (!getToken()) {
@@ -33,6 +60,7 @@ export function AppProvider({ children }) {
         setRole(null);
         setIsAuth(false);
         setAuthLoading(false);
+        disconnectSocket();
         return;
       }
       const { data } = await api.get("/auth/me");
@@ -40,6 +68,8 @@ export function AppProvider({ children }) {
         setUser(data.data.user);
         setRole(data.data.user.role);
         setIsAuth(true);
+        setupSocket();
+        fetchUnreadCount();
       } else {
         throw new Error("Invalid response");
       }
@@ -48,13 +78,18 @@ export function AppProvider({ children }) {
       setUser(null);
       setRole(null);
       setIsAuth(false);
+      disconnectSocket();
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [setupSocket, fetchUnreadCount]);
 
   useEffect(() => {
     refreshUser();
+    
+    return () => {
+      disconnectSocket();
+    };
   }, [refreshUser]);
 
   const login = async (credentials) => {
@@ -65,6 +100,8 @@ export function AppProvider({ children }) {
       if (data.data.user) {
         setUser(data.data.user);
         setRole(data.data.user.role);
+        setupSocket();
+        fetchUnreadCount();
       } else {
         await refreshUser();
       }
@@ -82,6 +119,8 @@ export function AppProvider({ children }) {
     setUser(null);
     setRole(null);
     setIsAuth(false);
+    setUnreadCount(0);
+    disconnectSocket();
   };
 
   return (

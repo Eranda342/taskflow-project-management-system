@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { StatusBadge, PriorityBadge, Avatar } from "../components/Badge";
 import { Modal, ConfirmDialog } from "../components/Modal";
+import CreateTaskModal from "../components/CreateTaskModal";
 import { useApp } from "../context/AppContext";
 import api from "../lib/api";
 
@@ -101,7 +102,7 @@ export function ProjectDetails() {
         addToast("success", "Member removed from project");
         setProject(prev => ({
           ...prev,
-          members: prev.members.filter(m => m._id !== userId)
+          members: prev.members.filter(m => m.user?._id !== userId)
         }));
       } else {
         throw new Error(res.data.message || "Failed to remove member");
@@ -174,7 +175,12 @@ export function ProjectDetails() {
                   ) : (
                     <Avatar name={owner.name} initials={owner.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
                   )}
-                  <span>{owner.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    {owner.name}
+                    {owner.role === 'project_manager' && (
+                      <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                    )}
+                  </span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
@@ -331,7 +337,12 @@ export function ProjectDetails() {
                       ) : (
                         <Avatar name={owner.name} initials={owner.name?.[0]} color="bg-blue-100 text-blue-700" size="sm" />
                       )}
-                      <span className="font-medium text-slate-900">{owner.name}</span>
+                      <span className="font-medium text-slate-900 flex items-center gap-1.5">
+                        {owner.name}
+                        {owner.role === 'project_manager' && (
+                          <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                        )}
+                      </span>
                     </dd>
                   )}
                 </div>
@@ -342,14 +353,14 @@ export function ProjectDetails() {
               <h3 className="text-sm font-semibold text-slate-900 mb-4">Team Members</h3>
               <div className="space-y-3">
                 {members.slice(0, 4).map((m) => (
-                  <div key={m._id} className="flex items-center gap-3">
-                    {m.profileImage ? (
-                      <img src={m.profileImage} alt={m.name} className="w-8 h-8 rounded-full" />
+                  <div key={m.user?._id} className="flex items-center gap-3">
+                    {m.user?.profileImage ? (
+                      <img src={m.user?.profileImage} alt={m.user?.name} className="w-8 h-8 rounded-full" />
                     ) : (
-                      <Avatar name={m.name} initials={m.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
+                      <Avatar name={m.user?.name} initials={m.user?.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
                     )}
                     <div>
-                      <div className="text-sm font-medium text-slate-900">{m.name}</div>
+                      <div className="text-sm font-medium text-slate-900">{m.user?.name}</div>
                       <div className="text-xs text-slate-500">{m.role === "project_manager" ? "Project Manager" : "Team Member"}</div>
                     </div>
                   </div>
@@ -427,7 +438,12 @@ export function ProjectDetails() {
                             ) : (
                               <Avatar name={assignee.name} initials={assignee.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
                             )}
-                            <span className="text-slate-700">{assignee.name}</span>
+                            <span className="text-slate-700 flex items-center gap-1.5">
+                              {assignee.name}
+                              {assignee.role === 'project_manager' && (
+                                <span className="text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded leading-none">PM</span>
+                              )}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-xs">Unassigned</span>
@@ -464,15 +480,15 @@ export function ProjectDetails() {
           </div>
           <div className="divide-y divide-slate-100">
             {members.map((member) => (
-              <div key={member._id} className="flex items-center gap-4 px-6 py-4">
-                {member.profileImage ? (
-                  <img src={member.profileImage} alt={member.name} className="w-10 h-10 rounded-full" />
+              <div key={member.user?._id} className="flex items-center gap-4 px-6 py-4">
+                {member.user?.profileImage ? (
+                  <img src={member.user?.profileImage} alt={member.user?.name} className="w-10 h-10 rounded-full" />
                 ) : (
-                  <Avatar name={member.name} initials={member.name?.[0]} color="bg-slate-100 text-slate-700" size="md" />
+                  <Avatar name={member.user?.name} initials={member.user?.name?.[0]} color="bg-slate-100 text-slate-700" size="md" />
                 )}
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-slate-900">{member.name}</div>
-                  <div className="text-xs text-slate-500">{member.email}</div>
+                  <div className="text-sm font-semibold text-slate-900">{member.user?.name}</div>
+                  <div className="text-xs text-slate-500">{member.user?.email}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
@@ -482,9 +498,9 @@ export function ProjectDetails() {
                   }`}>
                     {member.role === "admin" ? "Admin" : member.role === "project_manager" ? "Manager" : "Member"}
                   </span>
-                  {canManageMembers && member._id !== owner?._id && (
+                  {canManageMembers && member.user?._id !== owner?._id && (
                     <button
-                      onClick={() => setRemoveMemberConfirm(member._id)}
+                      onClick={() => setRemoveMemberConfirm(member.user?._id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <UserMinus className="w-4 h-4" />
@@ -510,7 +526,7 @@ export function ProjectDetails() {
         onClose={() => setCreateTaskOpen(false)}
         projectId={project._id}
         members={members}
-        onTaskCreated={(t) => setTasks((prev) => [...prev, t])}
+        onTaskCreated={(t) => { setTasks((prev) => [...prev, t]); addToast("success", "Task created successfully"); }}
       />
       
       <AddMemberModal
@@ -540,127 +556,6 @@ export function ProjectDetails() {
         danger
       />
     </div>
-  );
-}
-
-function CreateTaskModal({ open, onClose, projectId, members, onTaskCreated }) {
-  const { addToast } = useApp();
-  const [form, setForm] = useState({ title: "", description: "", assignedTo: "", priority: "medium", dueDate: "" });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) return;
-    
-    setLoading(true);
-    setError(null);
-    try {
-      const payload = {
-        title: form.title,
-        description: form.description,
-        priority: form.priority,
-      };
-      
-      if (form.dueDate) {
-        payload.dueDate = form.dueDate;
-      }
-      
-      if (form.assignedTo) {
-        payload.assignedTo = form.assignedTo;
-      }
-
-      const res = await api.post(`/projects/${projectId}/tasks`, payload);
-      
-      if (res.data.success) {
-        onTaskCreated(res.data.data.task);
-        addToast("success", "Task created successfully");
-        onClose();
-        setForm({ title: "", description: "", assignedTo: "", priority: "medium", dueDate: "" });
-      } else {
-        throw new Error(res.data.message || "Failed to create task");
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Error creating task";
-      setError(msg);
-      addToast("error", msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title="Create Task" size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <div className="p-3 bg-red-50 text-red-600 rounded text-sm">{error}</div>}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Title *</label>
-          <input
-            type="text"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="Task title"
-            required
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Description *</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Add a description..."
-            rows={3}
-            required
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Assignee</label>
-            <select
-              value={form.assignedTo}
-              onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Unassigned</option>
-              {members.map((u) => <option key={u._id} value={u._id}>{u.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
-            <select
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Due Date</label>
-          <input
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="flex gap-3 pt-2 justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors" disabled={loading}>
-            Cancel
-          </button>
-          <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50">
-            {loading && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-            Create Task
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 
@@ -743,17 +638,17 @@ function AddMemberModal({ open, onClose, projectId, onMemberAdded }) {
               <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors">
                 <div className="flex items-center gap-3">
                   {u.profileImage ? (
-                    <img src={u.profileImage} alt={u.name} className="w-8 h-8 rounded-full" />
+                    <img src={u.profileImage} alt={u.user?.name} className="w-8 h-8 rounded-full" />
                   ) : (
-                    <Avatar name={u.name} initials={u.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
+                    <Avatar name={u.user?.name} initials={u.user?.name?.[0]} color="bg-slate-100 text-slate-700" size="sm" />
                   )}
                   <div>
-                    <div className="text-sm font-medium text-slate-900">{u.name}</div>
+                    <div className="text-sm font-medium text-slate-900">{u.user?.name}</div>
                     <div className="text-xs text-slate-500">{u.email}</div>
                   </div>
                 </div>
                 <button
-                  onClick={() => handleAddMember(u.id, u.name)}
+                  onClick={() => handleAddMember(u.id, u.user?.name)}
                   disabled={addLoading === u.id}
                   className="inline-flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors disabled:opacity-50 w-16"
                 >

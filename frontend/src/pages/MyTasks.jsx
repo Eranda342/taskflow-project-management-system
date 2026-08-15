@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { Search, Plus, CheckSquare } from "lucide-react";
-import { TASKS, getProject, formatDate } from "../data/mockData";
+import api from "../lib/api";
 import { StatusBadge, PriorityBadge, EmptyState } from "../components/Badge";
 import { useApp } from "../context/AppContext";
 
-const MEMBER_ID = "u3";
+function formatDate(dateString) {
+  if (!dateString) return "—";
+  return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 const TABS = [
   { id: "all", label: "All" },
@@ -22,8 +25,22 @@ export function MyTasks() {
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [myTasks, setMyTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const myTasks = TASKS.filter((t) => t.assigneeId === MEMBER_ID);
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const { data } = await api.get("/tasks/my?limit=100");
+        setMyTasks(data.data.tasks);
+      } catch (err) {
+        addToast("error", "Failed to load tasks");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, [addToast]);
 
   const filtered = myTasks.filter((t) => {
     const matchTab =
@@ -32,11 +49,16 @@ export function MyTasks() {
       t.status === tab;
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase());
     const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
-    const matchProject = projectFilter === "all" || t.projectId === projectFilter;
+    const matchProject = projectFilter === "all" || (t.project && t.project._id === projectFilter);
     return matchTab && matchSearch && matchPriority && matchProject;
   });
 
-  const uniqueProjects = [...new Set(myTasks.map((t) => t.projectId))];
+  const uniqueProjects = [];
+  myTasks.forEach(t => {
+    if (t.project && !uniqueProjects.some(p => p.id === t.project._id)) {
+      uniqueProjects.push({ id: t.project._id, name: t.project.name });
+    }
+  });
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -111,16 +133,22 @@ export function MyTasks() {
           className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Projects</option>
-          {uniqueProjects.map((pid) => {
-            const p = getProject(pid);
-            return p ? <option key={pid} value={pid}>{p.name}</option> : null;
-          })}
+          {uniqueProjects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
         </select>
       </div>
 
       {/* Task list */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-20 text-blue-600">
+            <svg className="animate-spin h-8 w-8" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={<CheckSquare className="w-7 h-7" />}
             title="No tasks found"
@@ -141,13 +169,13 @@ export function MyTasks() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((task) => {
-                  const project = getProject(task.projectId);
-                  const isOverdue = task.status !== "completed" && new Date(task.dueDate) < new Date("2026-08-12");
+                  const project = task.project;
+                  const isOverdue = task.status !== "completed" && new Date(task.dueDate) < new Date();
                   return (
-                    <tr key={task.id} className="hover:bg-slate-50 transition-colors group">
+                    <tr key={task._id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4">
                         <Link
-                          to={`/app/tasks/${task.id}`}
+                          to={`/app/tasks/${task._id}`}
                           className={`font-medium group-hover:text-blue-600 transition-colors ${task.status === "completed" ? "line-through text-slate-400" : "text-slate-900"}`}
                         >
                           {task.title}
@@ -155,7 +183,7 @@ export function MyTasks() {
                       </td>
                       <td className="px-6 py-4 text-slate-500">
                         {project ? (
-                          <Link to={`/app/projects/${project.id}`} className="hover:text-blue-600 transition-colors">
+                          <Link to={`/app/projects/${project._id}`} className="hover:text-blue-600 transition-colors">
                             {project.name}
                           </Link>
                         ) : "—"}
