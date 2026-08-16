@@ -60,9 +60,15 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Determine assigned role (default to team_member)
-    const validRoles = ['team_member', 'project_manager'];
-    const assignedRole = (role && validRoles.includes(role)) ? role : 'team_member';
+    // Public registration may only create team_member accounts.
+    // Any client-supplied role other than 'team_member' (or absent) is rejected with 400.
+    if (role !== undefined && role !== 'team_member') {
+      return res.status(400).json({
+        success: false,
+        message: 'Public registration is restricted to the team_member role',
+      });
+    }
+    const assignedRole = 'team_member';
 
     // Create user with requested role
     const user = await User.create({

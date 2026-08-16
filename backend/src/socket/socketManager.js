@@ -7,7 +7,7 @@ const { canViewProject } = require('../utils/projectAccess');
 
 let io = null;
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 /**
  * Socket.IO authentication middleware

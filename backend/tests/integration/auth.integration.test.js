@@ -18,7 +18,7 @@ describe('Auth Integration Tests (POST /api/auth/*, GET /api/auth/me)', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('registers a new user with 201 status and defaults role to team_member', async () => {
+    it('registers successfully when role is omitted and defaults to team_member', async () => {
       const res = await request(app).post('/api/auth/register').send({
         name: 'Alice Member',
         email: 'alice@example.com',
@@ -39,19 +39,50 @@ describe('Auth Integration Tests (POST /api/auth/*, GET /api/auth/me)', () => {
       expect(userInDb.role).toBe('team_member');
     });
 
-    it('ignores client-supplied role: "admin" and strictly creates team_member', async () => {
+    it('registers successfully when role is explicitly "team_member"', async () => {
       const res = await request(app).post('/api/auth/register').send({
-        name: 'Attacker Admin',
-        email: 'attacker@example.com',
+        name: 'Explicit Member',
+        email: 'explicit@example.com',
         password: 'password123',
-        role: 'admin',
+        role: 'team_member',
       });
 
       expect(res.status).toBe(201);
       expect(res.body.data.user.role).toBe('team_member');
+    });
 
-      const userInDb = await User.findOne({ email: 'attacker@example.com' });
-      expect(userInDb.role).toBe('team_member');
+    it('rejects registration with role "project_manager" with 400 Bad Request', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        name: 'Attacker PM',
+        email: 'attacker_pm@example.com',
+        password: 'password123',
+        role: 'project_manager',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/restricted to the team_member role/i);
+
+      // Confirm no account was created
+      const userInDb = await User.findOne({ email: 'attacker_pm@example.com' });
+      expect(userInDb).toBeNull();
+    });
+
+    it('rejects registration with role "admin" with 400 Bad Request', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        name: 'Attacker Admin',
+        email: 'attacker_admin@example.com',
+        password: 'password123',
+        role: 'admin',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/restricted to the team_member role/i);
+
+      // Confirm no account was created
+      const userInDb = await User.findOne({ email: 'attacker_admin@example.com' });
+      expect(userInDb).toBeNull();
     });
 
     it('returns 409 Conflict when attempting to register with an existing email', async () => {

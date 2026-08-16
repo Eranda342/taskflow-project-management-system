@@ -261,12 +261,14 @@ export function TaskDetails() {
                 <h1 className="text-xl font-bold text-slate-900">{task.title}</h1>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setDeleteOpen(true)}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {(authUser?.role === "admin" || authUser?.role === "project_manager") && (
+                  <button
+                    onClick={() => setDeleteOpen(true)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
             <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{task.description || "No description provided."}</p>

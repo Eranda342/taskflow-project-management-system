@@ -199,4 +199,61 @@ describe('Task Integration Tests (/api/tasks/*, /api/projects/:projectId/tasks)'
       expect(res.body.data.tasks[0]._id.toString()).toBe(task1._id.toString());
     });
   });
+
+  describe('DELETE /api/tasks/:taskId — security regression', () => {
+    it('allows project owner (project_manager) to delete a task', async () => {
+      const pm = await createTestUser({ role: 'project_manager' });
+      const project = await createTestProject({ owner: pm._id, members: [pm._id] });
+      const task = await createTestTask({ project: project._id, createdBy: pm._id });
+
+      const res = await request(app)
+        .delete(`/api/tasks/${task._id}`)
+        .set('Authorization', `Bearer ${getAuthToken(pm._id)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('allows admin to delete any task', async () => {
+      const admin = await createTestUser({ role: 'admin' });
+      const pm = await createTestUser({ role: 'project_manager' });
+      const project = await createTestProject({ owner: pm._id, members: [pm._id] });
+      const task = await createTestTask({ project: project._id, createdBy: pm._id });
+
+      const res = await request(app)
+        .delete(`/api/tasks/${task._id}`)
+        .set('Authorization', `Bearer ${getAuthToken(admin._id)}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('denies team_member from deleting a task with 403 Forbidden', async () => {
+      const pm = await createTestUser({ role: 'project_manager' });
+      const tm = await createTestUser({ role: 'team_member' });
+      const project = await createTestProject({ owner: pm._id, members: [pm._id, tm._id] });
+      const task = await createTestTask({ project: project._id, createdBy: pm._id });
+
+      const res = await request(app)
+        .delete(`/api/tasks/${task._id}`)
+        .set('Authorization', `Bearer ${getAuthToken(tm._id)}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('denies non-owner project_manager from deleting a task with 403 Forbidden', async () => {
+      const owner = await createTestUser({ role: 'project_manager' });
+      const otherPm = await createTestUser({ role: 'project_manager' });
+      const project = await createTestProject({ owner: owner._id, members: [owner._id, otherPm._id] });
+      const task = await createTestTask({ project: project._id, createdBy: owner._id });
+
+      const res = await request(app)
+        .delete(`/api/tasks/${task._id}`)
+        .set('Authorization', `Bearer ${getAuthToken(otherPm._id)}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+  });
 });
