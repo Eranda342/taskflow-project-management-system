@@ -53,19 +53,24 @@ export function Profile() {
           <div>
             <p className="text-sm font-medium text-slate-900">{user.name}</p>
             <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => addToast("info", "Photo upload coming soon")}
-                className="text-xs font-medium text-blue-600 px-3 py-1.5 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                Upload photo
-              </button>
-              <button
-                onClick={() => addToast("info", "Photo removed")}
-                className="text-xs font-medium text-slate-600 px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                Remove
-              </button>
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  disabled
+                  title="Profile photo upload is not available in this version"
+                  className="text-xs font-medium text-slate-400 px-3 py-1.5 border border-slate-200 rounded-lg cursor-not-allowed opacity-60"
+                >
+                  Upload photo
+                </button>
+                <button
+                  disabled
+                  title="Profile photo upload is not available in this version"
+                  className="text-xs font-medium text-slate-400 px-3 py-1.5 border border-slate-200 rounded-lg cursor-not-allowed opacity-60"
+                >
+                  Remove
+                </button>
+              </div>
+              <p className="text-xs text-slate-400">Profile photo upload is not supported in this version.</p>
             </div>
           </div>
         </div>

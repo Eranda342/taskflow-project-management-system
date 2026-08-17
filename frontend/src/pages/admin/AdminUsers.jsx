@@ -91,9 +91,6 @@ export function AdminUsers() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">User Management</h2>
           <p className="text-slate-500 mt-1">Manage users on the platform.</p>
         </div>
-        <button onClick={() => addToast("info", "Invite user — coming soon")} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-          Invite User
-        </button>
       </div>
 
       {/* Filters */}

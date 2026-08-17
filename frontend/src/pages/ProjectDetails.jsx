@@ -40,6 +40,9 @@ export function ProjectDetails() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", description: "", status: "", deadline: "" });
+  const [editLoading, setEditLoading] = useState(false);
   const [removeMemberConfirm, setRemoveMemberConfirm] = useState(null);
   const [taskSearch, setTaskSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
@@ -92,6 +95,45 @@ export function ProjectDetails() {
     } catch (err) {
       const msg = err.response?.data?.message || err.message || "Error deleting project";
       addToast("error", msg);
+    }
+  };
+
+  const handleOpenEdit = () => {
+    setEditForm({
+      name: project.name || "",
+      description: project.description || "",
+      status: project.status || "planning",
+      deadline: project.deadline ? project.deadline.slice(0, 10) : "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditProject = async (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim()) {
+      addToast("error", "Project name is required");
+      return;
+    }
+    setEditLoading(true);
+    try {
+      const payload = {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        status: editForm.status,
+      };
+      if (editForm.deadline) payload.deadline = editForm.deadline;
+      const res = await api.patch(`/projects/${id}`, payload);
+      if (res.data.success) {
+        setProject(res.data.data.project);
+        addToast("success", "Project updated successfully");
+        setEditOpen(false);
+      } else {
+        throw new Error(res.data.message || "Failed to update project");
+      }
+    } catch (err) {
+      addToast("error", err.response?.data?.message || err.message || "Error updating project");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -200,7 +242,7 @@ export function ProjectDetails() {
           {canManageProject && (
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => addToast("info", "Edit project coming soon")}
+                onClick={handleOpenEdit}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 <Edit2 className="w-4 h-4" />
@@ -555,6 +597,76 @@ export function ProjectDetails() {
         confirmLabel="Remove"
         danger
       />
+
+      {/* Edit Project Modal */}
+      <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Project">
+        <form onSubmit={handleEditProject} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Project Name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+              maxLength={150}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <textarea
+              value={editForm.description}
+              onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))}
+              rows={3}
+              maxLength={2000}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <select
+                value={editForm.status}
+                onChange={(e) => setEditForm(f => ({ ...f, status: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="planning">Planning</option>
+                <option value="active">Active</option>
+                <option value="on_hold">On Hold</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
+              <input
+                type="date"
+                value={editForm.deadline}
+                onChange={(e) => setEditForm(f => ({ ...f, deadline: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setEditOpen(false)}
+              disabled={editLoading}
+              className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={editLoading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {editLoading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
@@ -662,3 +774,4 @@ function AddMemberModal({ open, onClose, projectId, onMemberAdded }) {
     </Modal>
   );
 }
+

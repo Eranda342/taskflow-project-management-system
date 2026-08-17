@@ -20,7 +20,10 @@ const TABS = [
 ];
 
 export function MyTasks() {
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
+  // Backend: POST /projects/:projectId/tasks requires admin or project_manager.
+  // Team members cannot create tasks — do not show the button to them.
+  const canCreateTask = user?.role === "admin" || user?.role === "project_manager";
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -67,13 +70,15 @@ export function MyTasks() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">My Tasks</h2>
           <p className="text-slate-500 mt-1">{myTasks.length} tasks assigned to you.</p>
         </div>
-        <button
-          onClick={() => addToast("info", "Create task — coming soon")}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create Task
-        </button>
+        {canCreateTask && (
+          <Link
+            to="/app/tasks"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create Task
+          </Link>
+        )}
       </div>
 
       {/* Tabs */}
