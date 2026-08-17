@@ -9,6 +9,7 @@ import api from "../lib/api";
 export function Dashboard() {
   const { user, addToast } = useApp();
   const userName = user?.name ? user.name.split(" ")[0] : "there";
+  const canCreateProject = user?.role === "admin" || user?.role === "project_manager";
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,12 +79,14 @@ export function Dashboard() {
           <p className="text-slate-500 mt-1">Here's what's happening with your projects today.</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            + New Project
-          </button>
+          {canCreateProject && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              + New Project
+            </button>
+          )}
         </div>
       </div>
 

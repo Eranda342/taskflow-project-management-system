@@ -17,7 +17,8 @@ const STATUS_OPTIONS = [
 ];
 
 export function Projects() {
-  const { addToast } = useApp();
+  const { addToast, user } = useApp();
+  const canCreateProject = user?.role === "admin" || user?.role === "project_manager";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -74,13 +75,15 @@ export function Projects() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Projects</h2>
           <p className="text-slate-500 mt-1">Manage and collaborate on your team's projects.</p>
         </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Create Project
-        </button>
+        {canCreateProject && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Project
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
