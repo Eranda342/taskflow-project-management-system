@@ -9,7 +9,6 @@ import {
   LogOut,
   Users,
   BarChart3,
-  Search,
   Menu,
   X,
   ChevronDown,
@@ -25,7 +24,6 @@ export function Layout() {
   const { user, role, unreadCount, logout } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [searchVal, setSearchVal] = useState("");
   const navigate = useNavigate();
 
   // Fallback while user is loading, although ProtectedRoute prevents rendering if not authenticated
@@ -146,16 +144,6 @@ export function Layout() {
             >
               <Menu size={22} />
             </button>
-            <div className="relative hidden sm:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                value={searchVal}
-                onChange={(e) => setSearchVal(e.target.value)}
-                placeholder="Search projects, tasks..."
-                className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 transition-all"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { StatusBadge, Avatar } from "../components/Badge";
 import { Modal } from "../components/Modal";
 import CreateProjectModal from "../components/CreateProjectModal";
@@ -19,7 +19,8 @@ const STATUS_OPTIONS = [
 export function Projects() {
   const { addToast, user } = useApp();
   const canCreateProject = user?.role === "admin" || user?.role === "project_manager";
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -67,6 +68,15 @@ export function Projects() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  const urlSearch = searchParams.get("search");
+  useEffect(() => {
+    if (urlSearch !== null) {
+      setSearch(urlSearch);
+      setPage(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSearch]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
