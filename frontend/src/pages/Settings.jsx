@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, Bell, Shield, Camera, Save, CheckCheck } from "lucide-react";
 import { Link } from "react-router";
 import { useApp } from "../context/AppContext";
@@ -35,6 +35,32 @@ export function Settings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const fileInputRef = useRef(null);
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const uploadRes = await api.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      const url = uploadRes.data.data.url;
+
+      await api.patch('/users/me/profile', { profileImage: url });
+      await refreshUser();
+      addToast("success", "Profile photo updated successfully");
+    } catch (err) {
+      addToast("error", err.response?.data?.message || "Failed to upload photo");
+    }
+    
+    // Clear input
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   // --- Notifications State ---
@@ -95,22 +121,35 @@ export function Settings() {
                 <h3 className="text-base font-semibold text-slate-900 mb-5">Profile Photo</h3>
                 <div className="flex items-center gap-6">
                   <div className="relative">
-                    <div className={`w-20 h-20 rounded-2xl ${user.color} flex items-center justify-center text-white text-2xl font-bold shadow-sm`}>
-                      {user.initials}
-                    </div>
-                    <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 transition-colors">
+                    {user.profileImage ? (
+                      <img src={`${import.meta.env.VITE_SOCKET_URL}${user.profileImage}`} alt="Profile" className="w-20 h-20 rounded-2xl object-cover shadow-sm" />
+                    ) : (
+                      <div className={`w-20 h-20 rounded-2xl ${user.color} flex items-center justify-center text-white text-2xl font-bold shadow-sm`}>
+                        {user.initials}
+                      </div>
+                    )}
+                    <button onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 transition-colors">
                       <Camera className="w-3.5 h-3.5" />
                     </button>
+                    <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-900">{user.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
                     <div className="mt-3 flex flex-col gap-2">
                       <div className="flex gap-2">
-                        <button disabled title="Profile photo upload is not available in this version" className="text-xs font-medium text-slate-400 px-3 py-1.5 border border-slate-200 rounded-lg cursor-not-allowed opacity-60">Upload photo</button>
-                        <button disabled title="Profile photo upload is not available in this version" className="text-xs font-medium text-slate-400 px-3 py-1.5 border border-slate-200 rounded-lg cursor-not-allowed opacity-60">Remove</button>
+                        <button onClick={() => fileInputRef.current?.click()} className="text-xs font-medium text-slate-700 px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Upload photo</button>
+                        {user.profileImage && (
+                          <button onClick={async () => {
+                            try {
+                               await api.patch('/users/me/profile', { profileImage: null });
+                               await refreshUser();
+                               addToast("success", "Photo removed");
+                            } catch(e) { addToast("error", "Failed to remove photo"); }
+                          }} className="text-xs font-medium text-slate-700 px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Remove</button>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-400">Profile photo upload is not supported in this version.</p>
+                      <p className="text-xs text-slate-400">Recommended size: 256x256px. Max size: 5MB.</p>
                     </div>
                   </div>
                 </div>

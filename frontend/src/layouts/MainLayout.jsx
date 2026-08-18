@@ -121,9 +121,13 @@ export function Layout() {
 
           <div className="mt-2 pt-2 border-t border-slate-800">
             <Link to="/app/settings" className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors" onClick={() => setSidebarOpen(false)}>
-              <div className={`w-9 h-9 rounded-full ${currentUser.color} flex items-center justify-center text-white font-semibold text-sm shrink-0`}>
-                {currentUser.initials}
-              </div>
+              {currentUser.profileImage ? (
+                <img src={`${import.meta.env.VITE_SOCKET_URL}${currentUser.profileImage}`} alt="Profile" className="w-9 h-9 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className={`w-9 h-9 rounded-full ${currentUser.color} flex items-center justify-center text-white font-semibold text-sm shrink-0`}>
+                  {currentUser.initials}
+                </div>
+              )}
               <div className="overflow-hidden">
                 <div className="text-sm font-medium text-white truncate">{currentUser.name}</div>
                 <div className="text-xs text-slate-400 truncate">{currentUser.roleLabel}</div>
@@ -166,9 +170,13 @@ export function Layout() {
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                <div className={`w-8 h-8 rounded-full ${currentUser.color} flex items-center justify-center text-white font-semibold text-sm`}>
-                  {currentUser.initials}
-                </div>
+                {currentUser.profileImage ? (
+                  <img src={`${import.meta.env.VITE_SOCKET_URL}${currentUser.profileImage}`} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className={`w-8 h-8 rounded-full ${currentUser.color} flex items-center justify-center text-white font-semibold text-sm`}>
+                    {currentUser.initials}
+                  </div>
+                )}
                 <div className="hidden sm:block text-left">
                   <div className="text-sm font-medium text-slate-900 leading-none">{currentUser.name}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{currentUser.roleLabel}</div>
