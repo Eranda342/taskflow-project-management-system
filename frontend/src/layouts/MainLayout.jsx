@@ -84,11 +84,11 @@ export function Layout() {
         <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
           <NavLabel>Main</NavLabel>
           {currentRole === "admin" ? (
-            <SideNavItem to="/app/admin" icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
+            <SideNavItem to="/app/admin" end icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
           ) : currentRole === "team_member" ? (
-            <SideNavItem to="/app/team-dashboard" icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
+            <SideNavItem to="/app/team-dashboard" end icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
           ) : (
-            <SideNavItem to="/app/dashboard" icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
+            <SideNavItem to="/app/dashboard" end icon={<LayoutDashboard size={17} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
           )}
           <SideNavItem to="/app/projects" icon={<FolderKanban size={17} />} label="Projects" onClick={() => setSidebarOpen(false)} />
           {currentRole === "team_member" ? (
@@ -233,10 +233,11 @@ function NavLabel({ children, className = "" }) {
   );
 }
 
-function SideNavItem({ to, icon, label, badge, onClick }) {
+function SideNavItem({ to, icon, label, badge, end, onClick }) {
   return (
     <NavLink
       to={to}
+      end={end}
       onClick={onClick}
       className={({ isActive }) =>
         `flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
