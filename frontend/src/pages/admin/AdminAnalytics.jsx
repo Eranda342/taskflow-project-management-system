@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Download } from "lucide-react";
@@ -129,25 +130,58 @@ export function AdminAnalytics() {
     ? Math.round((rTaskStatus.completed / totals.tasks) * 100) 
     : 0;
 
-  const generatePDF = () => {
-    const doc = new jsPDF();
-    
-    // Title
-    doc.setFontSize(20);
-    doc.text("TaskFlow Platform Analytics Report", 14, 22);
-    
-    // Date
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 30);
-    
-    // KPI Summary
-    doc.setFontSize(14);
-    doc.setTextColor(0);
-    doc.text("KPI Summary", 14, 45);
-    
-    autoTable(doc, {
-      startY: 50,
+  const [generating, setGenerating] = useState(false);
+
+  const generatePDF = async () => {
+    setGenerating(true);
+    try {
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text("TaskFlow Platform Analytics Report", 14, 22);
+      
+      // Date
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 30);
+      
+      let currentY = 40;
+
+      // Capture Charts
+      const chartsElement = document.getElementById("analytics-charts-container");
+      if (chartsElement) {
+        const canvas = await html2canvas(chartsElement, { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: "#f8fafc" // slate-50
+        });
+        const imgData = canvas.toDataURL("image/png");
+        
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const imgWidth = pdfWidth - 28; // 14 margin on each side
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.text("Visualizations", 14, currentY);
+        doc.addImage(imgData, "PNG", 14, currentY + 5, imgWidth, imgHeight);
+        
+        currentY = currentY + 5 + imgHeight + 15;
+      }
+      
+      if (currentY > 250) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      // KPI Summary
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text("KPI Summary", 14, currentY);
+      
+      autoTable(doc, {
+        startY: currentY + 5,
       head: [["Metric", "Value", "Note"]],
       body: [
         ["Total Users", totals.users.toString(), `${rUserStatus.active || 0} active`],
@@ -218,6 +252,12 @@ export function AdminAnalytics() {
     });
 
     doc.save("taskflow-analytics-report.pdf");
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      addToast("error", "Failed to generate PDF report");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -229,10 +269,15 @@ export function AdminAnalytics() {
         </div>
         <button
           onClick={generatePDF}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          disabled={generating}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <Download className="w-4 h-4" />
-          Download Report
+          {generating ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          {generating ? "Generating..." : "Download Report"}
         </button>
       </div>
 
@@ -255,7 +300,7 @@ export function AdminAnalytics() {
       </div>
 
       {/* Distribution charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="analytics-charts-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <ChartCard title="Users by Role" segments={usersByRole}>
           <DonutChart segments={usersByRole} size={140} label="users" />
         </ChartCard>
