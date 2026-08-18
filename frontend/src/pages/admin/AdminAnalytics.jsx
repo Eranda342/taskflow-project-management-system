@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Download } from "lucide-react";
 import api from "../../lib/api";
 import { useApp } from "../../context/AppContext";
 
@@ -126,11 +129,111 @@ export function AdminAnalytics() {
     ? Math.round((rTaskStatus.completed / totals.tasks) * 100) 
     : 0;
 
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.text("TaskFlow Platform Analytics Report", 14, 22);
+    
+    // Date
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 14, 30);
+    
+    // KPI Summary
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("KPI Summary", 14, 45);
+    
+    autoTable(doc, {
+      startY: 50,
+      head: [["Metric", "Value", "Note"]],
+      body: [
+        ["Total Users", totals.users.toString(), `${rUserStatus.active || 0} active`],
+        ["Total Projects", totals.projects.toString(), `${rProjStatus.completed || 0} completed`],
+        ["Total Tasks", totals.tasks.toString(), `${rTaskStatus.completed || 0} done`],
+        ["Completion Rate", `${completionRate}%`, "tasks done"],
+        ["Total Comments", (totals.comments || 0).toString(), "platform wide"]
+      ],
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+
+    // Users Breakdown
+    let finalY = doc.lastAutoTable.finalY || 50;
+    doc.text("Users Breakdown", 14, finalY + 15);
+    
+    autoTable(doc, {
+      startY: finalY + 20,
+      head: [["Role", "Count"]],
+      body: usersByRole.map(u => [u.label, u.value.toString()]),
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+    
+    // Projects Breakdown
+    finalY = doc.lastAutoTable.finalY || 50;
+    if (finalY > 230) {
+      doc.addPage();
+      finalY = 20;
+    } else {
+      finalY += 15;
+    }
+    
+    doc.text("Projects Breakdown", 14, finalY);
+    autoTable(doc, {
+      startY: finalY + 5,
+      head: [["Status", "Count"]],
+      body: projectsByStatus.map(p => [p.label, p.value.toString()]),
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+
+    // Tasks Breakdown
+    finalY = doc.lastAutoTable.finalY || 50;
+    if (finalY > 200) {
+      doc.addPage();
+      finalY = 20;
+    } else {
+      finalY += 15;
+    }
+
+    doc.text("Tasks Breakdown", 14, finalY);
+    autoTable(doc, {
+      startY: finalY + 5,
+      head: [["Status", "Count"]],
+      body: tasksByStatus.map(t => [t.label, t.value.toString()]),
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+
+    finalY = doc.lastAutoTable.finalY || 50;
+    autoTable(doc, {
+      startY: finalY + 10,
+      head: [["Priority", "Count"]],
+      body: tasksByPriority.map(t => [t.label, t.value.toString()]),
+      theme: 'striped',
+      headStyles: { fillColor: [37, 99, 235] }
+    });
+
+    doc.save("taskflow-analytics-report.pdf");
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Platform Analytics</h2>
-        <p className="text-slate-500 mt-1">Detailed metrics across users, projects, and tasks.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Platform Analytics</h2>
+          <p className="text-slate-500 mt-1">Detailed metrics across users, projects, and tasks.</p>
+        </div>
+        <button
+          onClick={generatePDF}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <Download className="w-4 h-4" />
+          Download Report
+        </button>
       </div>
 
       {/* KPI Row */}
