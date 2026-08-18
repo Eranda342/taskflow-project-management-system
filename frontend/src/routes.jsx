@@ -11,7 +11,7 @@ import { Tasks } from "./pages/Tasks";
 import { TaskDetails } from "./pages/TaskDetails";
 import { MyTasks } from "./pages/MyTasks";
 import { Notifications } from "./pages/Notifications";
-import { Profile } from "./pages/Profile";
+// Profile route removed, now integrated into Settings
 import { Settings } from "./pages/Settings";
 import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminUserDetails } from "./pages/admin/AdminUserDetails";
@@ -93,7 +93,7 @@ export const router = createBrowserRouter([
       { path: "tasks/:id", Component: TaskDetails },
       { path: "my-tasks", Component: MyTasks },
       { path: "notifications", Component: Notifications },
-      { path: "profile", Component: Profile },
+      // Profile route removed, now integrated into Settings
       { path: "settings", Component: Settings },
       { path: "admin/users", element: <AdminRoute><AdminUsers /></AdminRoute> },
       { path: "admin/users/:userId", element: <AdminRoute><AdminUserDetails /></AdminRoute> },

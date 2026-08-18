@@ -120,7 +120,7 @@ export function Layout() {
           </button>
 
           <div className="mt-2 pt-2 border-t border-slate-800">
-            <Link to="/app/profile" className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors" onClick={() => setSidebarOpen(false)}>
+            <Link to="/app/settings" className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors" onClick={() => setSidebarOpen(false)}>
               <div className={`w-9 h-9 rounded-full ${currentUser.color} flex items-center justify-center text-white font-semibold text-sm shrink-0`}>
                 {currentUser.initials}
               </div>
@@ -185,7 +185,7 @@ export function Layout() {
                       <div className="text-xs text-slate-500 mt-0.5">{currentUser.roleLabel}</div>
                     </div>
                     <div className="py-1">
-                      <DropdownLink to="/app/profile" icon={<User className="w-4 h-4" />} label="My Profile" onClick={() => setProfileOpen(false)} />
+                      {/* Profile link merged into Settings */}
                       <DropdownLink to="/app/settings" icon={<Settings className="w-4 h-4" />} label="Settings" onClick={() => setProfileOpen(false)} />
                     </div>
                     <div className="py-1 border-t border-slate-100">
