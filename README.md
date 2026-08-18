@@ -22,10 +22,11 @@
 - **Tasks**: Create, assign, and track tasks. Monitor status, priority, and deadlines with real-time updates.
 - **Comments**: Per-task commenting system to keep collaboration context-rich.
 - **Real-Time Notifications**: Durable inbox with unread counts and instant alerts via Socket.IO.
-- **Profiles**: Personalised dashboards for role-scoped overviews and basic profile management.
-- **Admin Dashboard**: Comprehensive user management, analytics, user activation/deactivation, and project ownership transfers.
+- **Profiles**: Personalised dashboards for role-scoped overviews, including profile photo uploads and management.
+- **Admin Dashboard**: Comprehensive user management, user activation/deactivation, and project ownership transfers.
+- **Admin Analytics & Reporting**: Deep insights into platform metrics, complete with downloadable PDF reports containing high-resolution visual charts (via `html-to-image` and `jspdf`).
 
-*(Note: Features like password resets, profile photo uploads, and user invitations are deliberately out of scope for the current system.)*
+*(Note: Features like password resets and user invitations are deliberately out of scope for the current system.)*
 
 ---
 
@@ -131,7 +132,7 @@ For security, TaskFlow does not include automated Admin seed scripts or hardcode
 
 ## 🧪 Testing
 
-The backend includes a comprehensive test suite (193 tests across 19 suites) covering Unit, Integration, and System/Real-time layers.
+The backend includes a comprehensive test suite (199 tests across 19 suites) covering Unit, Integration, and System/Real-time layers.
 
 ```bash
 cd backend
