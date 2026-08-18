@@ -1,196 +1,163 @@
-# TaskFlow
+# TaskFlow — Project Management System
 
-**TaskFlow** is a real-time, full-stack Project Management System that enables teams to organise projects, manage tasks, collaborate through comments, and receive live notifications — all within a role-based access control framework.
-
----
-
-## Development Status
-
-| Layer | Status |
-|:---|:---|
-| **Backend REST API** | ✅ Complete (B1–B19) |
-| **Backend Unit / Integration / System Tests** | ✅ Complete — 193 tests, 19 suites |
-| **Backend CI / Quality Gates** | ✅ Live via GitHub Actions |
-| **Frontend (React)** | 🚧 In development |
+**TaskFlow** is a modern, real-time, full-stack project management system designed to help teams organize projects, manage tasks, collaborate seamlessly through comments, and stay updated with live notifications. The platform is built on a robust role-based access control (RBAC) framework to ensure secure and efficient workflows.
 
 ---
 
-## User Roles
+## 🏗️ Architecture
+
+- **Frontend**: React (v19) + Vite + TailwindCSS v4
+- **Backend**: Node.js (v24) + Express
+- **Database**: MongoDB (via Mongoose)
+- **Authentication**: JWT-based with bcrypt password hashing
+- **Real-Time**: Socket.IO for live updates across clients
+
+---
+
+## ✨ Features
+
+- **Authentication**: Secure JWT-based registration and login with rate limiting.
+- **Role-Based Access Control (RBAC)**: Fine-grained access control across all frontend routes and backend APIs.
+- **Projects**: Create, update, and manage project lifecycles. Assign members and control visibility based on roles.
+- **Tasks**: Create, assign, and track tasks. Monitor status, priority, and deadlines with real-time updates.
+- **Comments**: Per-task commenting system to keep collaboration context-rich.
+- **Real-Time Notifications**: Durable inbox with unread counts and instant alerts via Socket.IO.
+- **Profiles**: Personalised dashboards for role-scoped overviews and basic profile management.
+- **Admin Dashboard**: Comprehensive user management, analytics, user activation/deactivation, and project ownership transfers.
+
+*(Note: Features like password resets, profile photo uploads, and user invitations are deliberately out of scope for the current system.)*
+
+---
+
+## 👥 User Roles
 
 | Role | Capabilities |
 |:---|:---|
-| **Admin** | Full platform access; user lifecycle, analytics, ownership transfer |
-| **Project Manager** | Create and manage own projects, assign tasks, manage members |
-| **Team Member** | View accessible projects, update assigned task status, comment |
+| **Admin** | Full platform access; manages users, views analytics, transfers project ownership. |
+| **Project Manager** | Creates and manages own projects, assigns tasks, adds/removes project members. |
+| **Team Member** | Views accessible projects, updates assigned task statuses, participates in comments. |
 
-Public registration always creates a `team_member` account. Role changes are admin-only.
-
----
-
-## Core Features (Backend)
-
-- **Authentication** — JWT-based register/login with rate limiting
-- **Role-Based Authorization** — fine-grained RBAC across all API routes
-- **Project Management** — create, update, delete, lifecycle status management
-- **Project Member Management** — add/remove members, room eviction on removal
-- **Task Management** — create, update, delete tasks within projects
-- **Task Assignment & Status Workflow** — controlled assignment and status transitions
-- **Comments** — per-task comments with author-only edit/delete
-- **Persistent Notifications** — durable inbox with unread count and mark-as-read
-- **Realtime Socket.IO** — live events after all writes are committed to MongoDB
-- **Role-Scoped Dashboards** — personalised overview by role
-- **Admin Operations** — user management, analytics, project ownership transfer
-- **User Lifecycle Safeguards** — inactive account protection, ownership transfer before deletion
+> **Note:** Public registration always creates a `Team Member` account. Elevating a user to Admin or Project Manager requires an existing Admin or database access.
 
 ---
 
-## Technology Stack
+## 📂 Project Structure
 
-### Backend
-
-| Technology | Version | Purpose |
-|:---|:---|:---|
-| Node.js | 24.x | Runtime |
-| Express | ^5.2.1 | Web framework |
-| MongoDB | 7.0 | Primary database |
-| Mongoose | ^9.9.1 | ODM / schema validation |
-| Socket.IO | ^4.8.3 | Realtime WebSocket layer |
-| jsonwebtoken | ^9.0.3 | JWT authentication |
-| bcryptjs | ^3.0.3 | Password hashing |
-| Helmet | ^8.3.0 | HTTP security headers |
-| express-rate-limit | ^8.6.2 | Auth brute-force protection |
-| dotenv | ^17.4.2 | Environment variable loading |
-| cors | ^2.8.6 | Cross-origin resource sharing |
-
-### Testing & Quality
-
-| Tool | Version | Purpose |
-|:---|:---|:---|
-| Jest | ^30.4.2 | Test runner |
-| Supertest | ^7.2.2 | HTTP integration testing |
-| socket.io-client | ^4.8.3 | Realtime system testing |
-| ESLint | ^10.8.1 | Static analysis |
-| GitHub Actions | — | CI quality pipeline |
-
-### Frontend (in development)
-
-- React (Vite)
-- Axios
-- React Router
-- Socket.IO Client
-
----
-
-## Project Structure
-
-```
+```text
 taskflow-project-management-system/
-├── backend/             # Node.js/Express API (complete)
+├── backend/             # Node.js/Express API
 │   ├── src/
-│   │   ├── app.js
-│   │   ├── server.js
-│   │   ├── config/      # Database connection
+│   │   ├── config/      # Database and environment configurations
 │   │   ├── controllers/ # Request handlers
 │   │   ├── middleware/  # Auth, RBAC, error handling, rate limiting
 │   │   ├── models/      # Mongoose schemas
-│   │   ├── routes/      # Express route definitions
-│   │   ├── services/    # Reusable business logic (notifications)
-│   │   ├── socket/      # Socket.IO server and room management
-│   │   └── utils/       # Constants, helpers, validation
-│   └── tests/
-│       ├── unit/        # Isolated middleware/utility tests (6 suites)
-│       ├── integration/ # API + MongoDB tests via Supertest (11 suites)
-│       ├── system/      # Full REST + Socket.IO multi-client tests (2 suites)
-│       └── helpers/     # Shared test factories and socket client utilities
-├── frontend/            # React frontend (in development)
-├── docs/                # Architecture, API, testing documentation
-└── .github/workflows/   # GitHub Actions CI
+│   │   ├── routes/      # Express API routes
+│   │   ├── services/    # Business logic (e.g., notifications)
+│   │   └── socket/      # Socket.IO server and room management
+│   └── tests/           # Unit, Integration, and System tests
+├── frontend/            # React/Vite Frontend Application
+│   ├── src/
+│   │   ├── components/  # Reusable UI components
+│   │   ├── contexts/    # React Context (Auth, Socket)
+│   │   ├── hooks/       # Custom React hooks
+│   │   ├── lib/         # Utilities (Axios config, Socket client)
+│   │   └── pages/       # Application views (Auth, Dashboard, Admin, etc.)
+└── docs/                # Architecture, API, and testing documentation
 ```
 
 ---
 
-## Quick Start (Backend)
+## 🚀 Setup & Installation
 
 ### Prerequisites
 
-- Node.js ≥ 18
-- MongoDB instance (local or Atlas)
+- **Node.js** (v18 or higher recommended; developed on v24.x)
+- **MongoDB** instance (local or Atlas cluster)
 
-### Setup
+### 1. Backend Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your credentials
-npm run dev
 ```
 
-### Health check
+**Environment Variables**:
+Create a `.env` file in the `backend/` directory based on `.env.example`:
 
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+CLIENT_URL=http://localhost:3000
 ```
-GET http://localhost:5000/api/health
-→ 200 { "success": true, "message": "TaskFlow API is running" }
+
+**Start the Backend**:
+```bash
+npm run dev   # Starts the server with nodemon
 ```
+*Health Check: Navigate to `http://localhost:5000/api/health` to confirm the API is running.*
+
+### 2. Frontend Setup
+
+```bash
+cd frontend
+npm install
+```
+
+**Environment Variables**:
+Create a `.env` file in the `frontend/` directory based on `.env.example`:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_SOCKET_URL=http://localhost:5000
+```
+
+**Start the Frontend**:
+```bash
+npm run dev   # Starts the Vite development server on port 3000
+```
+
+### 3. Creating the First Admin Account
+
+For security, TaskFlow does not include automated Admin seed scripts or hardcoded credentials. To create your first Admin account:
+
+1. Register a new user via the public `/register` frontend route. This creates a `team_member` account.
+2. Connect to your MongoDB database using a tool like MongoDB Compass or `mongosh`.
+3. Locate the `users` collection.
+4. Find your user document and change the `role` field from `team_member` to `admin`.
+5. Log in to the application to access the Admin dashboard.
 
 ---
 
-## Running Tests
+## 🧪 Testing
 
-See [`docs/testing.md`](docs/testing.md) for full documentation.
+The backend includes a comprehensive test suite (193 tests across 19 suites) covering Unit, Integration, and System/Real-time layers.
 
 ```bash
 cd backend
-npm run test:unit          # Unit tests only
-npm run test:integration   # Integration tests (requires MONGO_URI_TEST)
-npm run test:system        # System / realtime tests
-npm test                   # All 193 tests
-npm run test:coverage      # Coverage with CI thresholds
+npm test                   # Run all tests
+npm run test:unit          # Run isolated unit tests
+npm run test:integration   # Run integration tests (Requires MONGO_URI_TEST)
+npm run test:system        # Run real-time Socket.IO tests
 ```
 
-> **Important:** Integration and system tests require a dedicated `MONGO_URI_TEST` database. They never touch the development database. See `backend/.env.test.example`.
+> **Important**: Integration and System tests require a dedicated test database to avoid corrupting development data. Configure `MONGO_URI_TEST` in a `backend/.env.test.example` equivalent file.
 
 ---
 
-## Static Analysis
+## 📦 Deployment
+
+### Building the Frontend
+
+To build the React frontend for production:
 
 ```bash
-npm run lint               # Lint src + tests (fails on any warning)
-npm run lint:src           # Lint src only
-npm run lint:tests         # Lint tests only
+cd frontend
+npm run build
 ```
 
----
+This generates an optimized static bundle in the `frontend/dist` directory. Ensure that `VITE_API_URL` and `VITE_SOCKET_URL` are properly set in your production CI/CD environment, as they are explicitly required during the Vite build process.
 
-## Documentation
+### CI/CD Pipeline
 
-| Document | Description |
-|:---|:---|
-| [`docs/api.md`](docs/api.md) | Complete REST API reference |
-| [`docs/architecture.md`](docs/architecture.md) | System architecture and request flow |
-| [`docs/authorization-matrix.md`](docs/authorization-matrix.md) | RBAC authorization matrix |
-| [`docs/data-model.md`](docs/data-model.md) | Mongoose data models and relationships |
-| [`docs/testing.md`](docs/testing.md) | Test strategy and evidence |
-| [`docs/security.md`](docs/security.md) | Security measures |
-| [`docs/devops.md`](docs/devops.md) | CI pipeline documentation |
-| [`docs/coursework-evidence.md`](docs/coursework-evidence.md) | Evidence index for coursework |
-
----
-
-## CI / CD
-
-Every push and pull request on `main` that touches backend code runs the full GitHub Actions quality pipeline:
-
-```
-npm ci → lint → unit tests → integration tests → system tests → coverage gate → artifact upload
-```
-
-**CI: ✅ Implemented** | **CD/Deployment: not yet configured**
-
-See [`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml).
-
----
-
-## License
-
-ISC
+TaskFlow includes GitHub Actions workflows for continuous integration. Every push and pull request to the `main` branch automatically runs formatting checks, linting, and the complete backend test suite to prevent regressions.
