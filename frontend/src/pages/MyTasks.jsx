@@ -48,7 +48,7 @@ export function MyTasks() {
   const filtered = myTasks.filter((t) => {
     const matchTab =
       tab === "all" ? true :
-      tab === "overdue" ? (t.status !== "completed" && new Date(t.dueDate) < new Date("2026-08-12")) :
+      tab === "overdue" ? (t.status !== "completed" && new Date(t.dueDate) < new Date()) :
       t.status === tab;
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase());
     const matchPriority = priorityFilter === "all" || t.priority === priorityFilter;
