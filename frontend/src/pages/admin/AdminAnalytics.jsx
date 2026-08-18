@@ -63,6 +63,7 @@ export function AdminAnalytics() {
   const { addToast } = useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     async function fetchStats() {
@@ -129,8 +130,6 @@ export function AdminAnalytics() {
   const completionRate = totals.tasks > 0 
     ? Math.round((rTaskStatus.completed / totals.tasks) * 100) 
     : 0;
-
-  const [generating, setGenerating] = useState(false);
 
   const generatePDF = async () => {
     setGenerating(true);
