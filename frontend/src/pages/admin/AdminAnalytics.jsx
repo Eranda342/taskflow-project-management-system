@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import html2canvas from "html2canvas";
+import * as htmlToImage from "html-to-image";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Download } from "lucide-react";
@@ -150,16 +150,19 @@ export function AdminAnalytics() {
       // Capture Charts
       const chartsElement = document.getElementById("analytics-charts-container");
       if (chartsElement) {
-        const canvas = await html2canvas(chartsElement, { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: "#f8fafc" // slate-50
+        const imgData = await htmlToImage.toPng(chartsElement, { 
+          backgroundColor: "#f8fafc", // slate-50
+          pixelRatio: 2
         });
-        const imgData = canvas.toDataURL("image/png");
+        
+        // Load image to get natural dimensions
+        const img = new Image();
+        img.src = imgData;
+        await new Promise((resolve) => { img.onload = resolve; });
         
         const pdfWidth = doc.internal.pageSize.getWidth();
         const imgWidth = pdfWidth - 28; // 14 margin on each side
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgHeight = (img.height * imgWidth) / img.width;
         
         doc.setFontSize(14);
         doc.setTextColor(0);
