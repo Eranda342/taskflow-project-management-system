@@ -9,6 +9,13 @@ let io = null;
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
+const allowedOrigins = [
+  'http://localhost:3000',
+];
+if (CLIENT_URL && !allowedOrigins.includes(CLIENT_URL)) {
+  allowedOrigins.push(CLIENT_URL);
+}
+
 /**
  * Socket.IO authentication middleware
  */
@@ -67,7 +74,7 @@ const socketAuthMiddleware = async (socket, next) => {
 const initSocket = (server, customCors) => {
   io = new Server(server, {
     cors: customCors || {
-      origin: CLIENT_URL,
+      origin: allowedOrigins,
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
       credentials: true,
     },

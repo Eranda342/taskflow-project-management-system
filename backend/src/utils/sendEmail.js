@@ -44,6 +44,10 @@ const sendEmail = async (options) => {
   // In development/test mode without real credentials, log the message ID
   if (process.env.NODE_ENV !== 'production' && !process.env.SMTP_USER) {
     console.log('Message sent (Mock): %s', info.messageId);
+  } else if (process.env.SMTP_HOST === 'smtp.ethereal.email') {
+    // If using Ethereal, log the preview URL so the user can easily read the email
+    console.log('Ethereal Email sent: %s', info.messageId);
+    console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
   }
 };
 

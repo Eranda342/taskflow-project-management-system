@@ -17,6 +17,13 @@ const app = express();
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
+const allowedOrigins = [
+  'http://localhost:3000',
+];
+if (CLIENT_URL && !allowedOrigins.includes(CLIENT_URL)) {
+  allowedOrigins.push(CLIENT_URL);
+}
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: false, // allow images to be loaded by frontend
@@ -24,7 +31,7 @@ app.use(helmet({
 
 app.use(
   cors({
-    origin: CLIENT_URL,
+    origin: allowedOrigins,
     credentials: true,
   })
 );

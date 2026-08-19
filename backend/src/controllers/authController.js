@@ -251,16 +251,18 @@ const forgotPassword = async (req, res) => {
     const resetToken = user.getResetPasswordToken();
     await user.save({ validateBeforeSave: false });
 
-    // Create reset url
     const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
 
-    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+    const { getPasswordResetEmailTemplate } = require('../utils/emailTemplates');
+    const message = `You requested a password reset. Please go to this link to reset your password:\n\n${resetUrl}\n\nIf you didn't request this, please ignore this email.`;
+    const htmlMessage = getPasswordResetEmailTemplate(resetUrl, user.name);
 
     try {
       await sendEmail({
         email: user.email,
-        subject: 'Password reset token',
+        subject: 'TaskFlow - Password Reset Request',
         message,
+        html: htmlMessage,
       });
 
       return genericResponse();
