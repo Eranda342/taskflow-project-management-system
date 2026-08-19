@@ -34,7 +34,7 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).select('+passwordChangedAt');
 
     if (!user) {
       return res.status(401).json({
@@ -48,6 +48,17 @@ const authenticate = async (req, res, next) => {
         success: false,
         message: 'Your account is inactive',
       });
+    }
+
+    // Reject tokens issued before the last password change
+    if (user.passwordChangedAt) {
+      const changedAtSeconds = Math.floor(user.passwordChangedAt.getTime() / 1000);
+      if (decoded.iat < changedAtSeconds) {
+        return res.status(401).json({
+          success: false,
+          message: 'Password was recently changed. Please log in again.',
+        });
+      }
     }
 
     req.user = user;

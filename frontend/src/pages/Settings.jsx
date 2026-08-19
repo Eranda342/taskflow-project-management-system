@@ -3,6 +3,7 @@ import { User, Bell, Shield, Camera, Save, CheckCheck } from "lucide-react";
 import { Link } from "react-router";
 import { useApp } from "../context/AppContext";
 import api from "../lib/api";
+import { setToken } from "../lib/auth";
 
 export function Settings() {
   const { user: authUser, addToast, refreshUser, setUnreadCount } = useApp();
@@ -22,6 +23,33 @@ export function Settings() {
   useEffect(() => {
     setForm({ name: user.name || "", email: user.email || "" });
   }, [user.name, user.email]);
+
+  // --- Password State ---
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+    setPasswordSaving(true);
+    try {
+      const res = await api.patch('/users/me/password', passwordForm);
+      if (res.data.success && res.data.data.token) {
+        setToken(res.data.data.token);
+        // Refresh api instance default header is handled by the interceptor automatically reading from localStorage
+      }
+      addToast("success", "Password updated successfully");
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      if (err.response?.data?.errors) {
+        const errorMsgs = Object.values(err.response.data.errors).join(", ");
+        addToast("error", errorMsgs);
+      } else {
+        addToast("error", err.response?.data?.message || "Failed to update password");
+      }
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -250,16 +278,54 @@ export function Settings() {
 
           {section === "security" && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-              <h3 className="text-base font-semibold text-slate-900 mb-4">Security</h3>
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-                <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <h3 className="text-base font-semibold text-slate-900 mb-5">Change Password</h3>
+              <form onSubmit={handleSavePassword} className="space-y-4 max-w-md">
                 <div>
-                  <h4 className="text-sm font-medium text-amber-900">Managed Externally</h4>
-                  <p className="text-sm text-amber-700 mt-1">
-                    Authentication and password management are handled by your system administrator. If you need to reset your password or update your security credentials, please contact your workspace admin.
-                  </p>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Current Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1.5">Must be at least 8 characters long.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+                <div className="pt-4">
+                  <button
+                    type="submit"
+                    disabled={passwordSaving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                    className="inline-flex items-center justify-center w-full gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {passwordSaving ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Shield className="w-4 h-4" />
+                    )}
+                    Update Password
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>

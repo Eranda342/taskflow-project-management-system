@@ -5,6 +5,7 @@ const {
   updateUserRole,
   updateUserStatus,
   updateOwnProfile,
+  updatePassword,
 } = require('../controllers/userController');
 const { authenticate } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -12,8 +13,9 @@ const { ROLES } = require('../utils/roles');
 
 const router = express.Router();
 
-// Current user profile update (must precede /:userId route)
+// Current user profile/password update (must precede /:userId route)
 router.patch('/me/profile', authenticate, updateOwnProfile);
+router.patch('/me/password', authenticate, updatePassword);
 
 // Admin-only user management routes
 router.get('/', authenticate, authorizeRoles(ROLES.ADMIN), getUsers);

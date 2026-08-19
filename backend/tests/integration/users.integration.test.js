@@ -183,4 +183,111 @@ describe('User / RBAC Integration Tests (/api/users/*)', () => {
       expect(inDb.email).toBe('user@example.com');
     });
   });
+
+  describe('PATCH /api/users/me/password', () => {
+    it('allows user to change password and returns fresh token, invalidating the old one', async () => {
+      const user = await createTestUser({ password: 'oldpassword123' });
+      const oldToken = getAuthToken(user._id);
+
+      const res = await request(app)
+        .patch('/api/users/me/password')
+        .set('Authorization', `Bearer ${oldToken}`)
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'newpassword456',
+          confirmPassword: 'newpassword456',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.token).toBeDefined();
+      expect(res.body.data.token).not.toBe(oldToken);
+      expect(res.body.data.user.password).toBeUndefined();
+
+      // Verify login with new password
+      const loginRes = await request(app).post('/api/auth/login').send({
+        email: user.email,
+        password: 'newpassword456',
+      });
+      expect(loginRes.status).toBe(200);
+
+      // Verify login with old password fails
+      const badLoginRes = await request(app).post('/api/auth/login').send({
+        email: user.email,
+        password: 'oldpassword123',
+      });
+      expect(badLoginRes.status).toBe(401);
+
+      // Verify old token is rejected due to passwordChangedAt invalidation
+      const meRes = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${oldToken}`);
+      expect(meRes.status).toBe(401);
+      expect(meRes.body.message).toMatch(/recently changed/i);
+    });
+
+    it('rejects incorrect current password', async () => {
+      const user = await createTestUser({ password: 'oldpassword123' });
+
+      const res = await request(app)
+        .patch('/api/users/me/password')
+        .set('Authorization', `Bearer ${getAuthToken(user._id)}`)
+        .send({
+          currentPassword: 'wrongpassword',
+          newPassword: 'newpassword456',
+          confirmPassword: 'newpassword456',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors.currentPassword).toBeDefined();
+    });
+
+    it('rejects confirmation mismatch', async () => {
+      const user = await createTestUser({ password: 'oldpassword123' });
+
+      const res = await request(app)
+        .patch('/api/users/me/password')
+        .set('Authorization', `Bearer ${getAuthToken(user._id)}`)
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'newpassword456',
+          confirmPassword: 'newpassword999',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors.confirmPassword).toBeDefined();
+    });
+
+    it('rejects password reuse', async () => {
+      const user = await createTestUser({ password: 'oldpassword123' });
+
+      const res = await request(app)
+        .patch('/api/users/me/password')
+        .set('Authorization', `Bearer ${getAuthToken(user._id)}`)
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'oldpassword123',
+          confirmPassword: 'oldpassword123',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors.newPassword).toMatch(/cannot be the same as the current password/i);
+    });
+
+    it('rejects new password that is too short', async () => {
+      const user = await createTestUser({ password: 'oldpassword123' });
+
+      const res = await request(app)
+        .patch('/api/users/me/password')
+        .set('Authorization', `Bearer ${getAuthToken(user._id)}`)
+        .send({
+          currentPassword: 'oldpassword123',
+          newPassword: 'short',
+          confirmPassword: 'short',
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors.newPassword).toMatch(/at least 8 characters long/i);
+    });
+  });
 });

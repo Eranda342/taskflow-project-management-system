@@ -4,6 +4,8 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const { ROLES, ROLE_LIST } = require('../utils/roles');
 const { parsePagination } = require('../utils/validation');
+const bcrypt = require('bcryptjs');
+const generateToken = require('../utils/generateToken');
 
 /**
  * Format a User document for public API responses without sensitive fields
@@ -355,10 +357,96 @@ const updateOwnProfile = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Update authenticated user's password
+ * @route   PATCH /api/users/me/password
+ * @access  Private (Authenticated user)
+ */
+const updatePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    const errors = {};
+
+    if (!currentPassword) {
+      errors.currentPassword = 'Current password is required';
+    }
+    if (!newPassword) {
+      errors.newPassword = 'New password is required';
+    } else if (newPassword.length < 8) {
+      errors.newPassword = 'Password must be at least 8 characters long';
+    }
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Confirm password is required';
+    } else if (newPassword !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors,
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: {
+          newPassword: 'New password cannot be the same as the current password',
+        },
+      });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: {
+          currentPassword: 'Incorrect current password',
+        },
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.passwordChangedAt = new Date();
+    await user.save();
+
+    const token = generateToken(user._id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
+      data: {
+        token,
+        user: formatUser(user),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUserById,
   updateUserRole,
   updateUserStatus,
   updateOwnProfile,
+  updatePassword,
 };
