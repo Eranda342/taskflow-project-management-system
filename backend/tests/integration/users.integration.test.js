@@ -189,6 +189,9 @@ describe('User / RBAC Integration Tests (/api/users/*)', () => {
       const user = await createTestUser({ password: 'oldpassword123' });
       const oldToken = getAuthToken(user._id);
 
+      // Wait 1 second so the new JWT generated after reset has a strictly greater iat
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const res = await request(app)
         .patch('/api/users/me/password')
         .set('Authorization', `Bearer ${oldToken}`)

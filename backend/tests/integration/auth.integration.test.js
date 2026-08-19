@@ -215,4 +215,153 @@ describe('Auth Integration Tests (POST /api/auth/*, GET /api/auth/me)', () => {
       expect(res.body.success).toBe(false);
     });
   });
+
+  describe('POST /api/auth/forgot-password', () => {
+    it('returns 200 generic success for existing email and generates token', async () => {
+      const user = await createTestUser({ email: 'forgot@example.com' });
+      const res = await request(app).post('/api/auth/forgot-password').send({
+        email: 'forgot@example.com',
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toMatch(/we have sent a password reset link/i);
+
+      const dbUser = await User.findById(user._id).select('+resetPasswordToken +resetPasswordExpire');
+      expect(dbUser.resetPasswordToken).toBeDefined();
+      expect(dbUser.resetPasswordExpire).toBeDefined();
+    });
+
+    it('returns 200 generic success for unknown email to prevent enumeration', async () => {
+      const res = await request(app).post('/api/auth/forgot-password').send({
+        email: 'nobody@example.com',
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toMatch(/we have sent a password reset link/i);
+    });
+
+    it('returns 400 if email is missing', async () => {
+      const res = await request(app).post('/api/auth/forgot-password').send({});
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /api/auth/reset-password', () => {
+    it('successfully resets password, invalidates old JWT, and clears token', async () => {
+      const crypto = require('crypto');
+      const user = await createTestUser({ email: 'reset@example.com', password: 'oldpassword123' });
+      
+      // Get old token
+      const oldToken = getAuthToken(user._id);
+      
+      // Simulate forgot password to get token
+      const resetToken = crypto.randomBytes(20).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      
+      await User.findByIdAndUpdate(user._id, {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: Date.now() + 10 * 60 * 1000,
+      });
+
+      // Wait 1 second so the new JWT generated after reset has a strictly greater iat
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Reset password
+      const res = await request(app).post('/api/auth/reset-password').send({
+        token: resetToken,
+        newPassword: 'newpassword456',
+        confirmPassword: 'newpassword456',
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      // Verify db changes
+      const dbUser = await User.findById(user._id).select('+password +resetPasswordToken +resetPasswordExpire +passwordChangedAt');
+      expect(dbUser.resetPasswordToken).toBeUndefined();
+      expect(dbUser.resetPasswordExpire).toBeUndefined();
+      expect(dbUser.passwordChangedAt).toBeDefined();
+
+      // Verify old password fails
+      const loginFail = await request(app).post('/api/auth/login').send({
+        email: 'reset@example.com',
+        password: 'oldpassword123',
+      });
+      expect(loginFail.status).toBe(401);
+
+      // Verify new password works
+      const loginSuccess = await request(app).post('/api/auth/login').send({
+        email: 'reset@example.com',
+        password: 'newpassword456',
+      });
+      expect(loginSuccess.status).toBe(200);
+
+      // Verify old JWT fails
+      const meRes = await request(app)
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${oldToken}`);
+      expect(meRes.status).toBe(401);
+    });
+
+    it('rejects invalid token', async () => {
+      const res = await request(app).post('/api/auth/reset-password').send({
+        token: 'invalid-token-123',
+        newPassword: 'newpassword456',
+        confirmPassword: 'newpassword456',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/Invalid or expired token/i);
+    });
+
+    it('rejects expired token', async () => {
+      const crypto = require('crypto');
+      const user = await createTestUser();
+      const resetToken = crypto.randomBytes(20).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      
+      await User.findByIdAndUpdate(user._id, {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: Date.now() - 1000, // Expired
+      });
+
+      const res = await request(app).post('/api/auth/reset-password').send({
+        token: resetToken,
+        newPassword: 'newpassword456',
+        confirmPassword: 'newpassword456',
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/Invalid or expired token/i);
+    });
+
+    it('validates password constraints', async () => {
+      const crypto = require('crypto');
+      const user = await createTestUser();
+      const resetToken = crypto.randomBytes(20).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      await User.findByIdAndUpdate(user._id, {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: Date.now() + 10000,
+      });
+
+      const res1 = await request(app).post('/api/auth/reset-password').send({
+        token: resetToken,
+        newPassword: 'short',
+        confirmPassword: 'short',
+      });
+      expect(res1.status).toBe(400);
+      expect(res1.body.errors.newPassword).toBeDefined();
+
+      const res2 = await request(app).post('/api/auth/reset-password').send({
+        token: resetToken,
+        newPassword: 'newpassword456',
+        confirmPassword: 'mismatch456',
+      });
+      expect(res2.status).toBe(400);
+      expect(res2.body.errors.confirmPassword).toBeDefined();
+    });
+  });
 });

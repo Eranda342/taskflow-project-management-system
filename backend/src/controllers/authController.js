@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const sendEmail = require('../utils/sendEmail');
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -217,8 +219,148 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Forgot Password - Send reset email
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an email address',
+      });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    // Always return this same generic response immediately to prevent account enumeration
+    const genericResponse = () => res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, we have sent a password reset link.',
+    });
+
+    if (!user || user.status === 'inactive') {
+      return genericResponse();
+    }
+
+    // Get reset token (unhashed)
+    const resetToken = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset url
+    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a PUT request to: \n\n ${resetUrl}`;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Password reset token',
+        message,
+      });
+
+      return genericResponse();
+    } catch (err) {
+      console.error(err);
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      // Even if email fails, return generic response to prevent enumeration
+      return genericResponse();
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+/**
+ * @desc    Reset Password
+ * @route   POST /api/auth/reset-password
+ * @access  Public
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Invalid or missing token' });
+    }
+
+    // Hash URL token
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    }).select('+password');
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token',
+      });
+    }
+
+    const errors = {};
+    if (!newPassword) {
+      errors.newPassword = 'New password is required';
+    } else if (newPassword.length < 8) {
+      errors.newPassword = 'Password must be at least 8 characters long';
+    }
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Confirm password is required';
+    } else if (newPassword !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors,
+      });
+    }
+
+    // Set new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
+    // Invalidate old tokens
+    user.passwordChangedAt = Date.now();
+    
+    // Clear reset token fields
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getCurrentUser,
+  forgotPassword,
+  resetPassword,
 };

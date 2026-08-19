@@ -105,9 +105,14 @@ export function Login() {
           {errors.password && <p className="mt-1.5 text-xs text-red-600">{errors.password}</p>}
         </div>
 
-        <div className="flex items-center gap-2">
-          <input id="remember-me" type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-          <label htmlFor="remember-me" className="text-sm text-slate-700">Remember me</label>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <input id="remember-me" type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <label htmlFor="remember-me" className="text-sm text-slate-700">Remember me</label>
+          </div>
+          <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+            Forgot password?
+          </Link>
         </div>
 
 
