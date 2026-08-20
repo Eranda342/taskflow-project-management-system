@@ -256,6 +256,8 @@ const forgotPassword = async (req, res) => {
     const { getPasswordResetEmailTemplate } = require('../utils/emailTemplates');
     const message = `You requested a password reset. Please go to this link to reset your password:\n\n${resetUrl}\n\nIf you didn't request this, please ignore this email.`;
     const htmlMessage = getPasswordResetEmailTemplate(resetUrl, user.name);
+    
+    console.log(`[QA INTERCEPT] Password Reset URL for ${user.email}: ${resetUrl}`);
 
     try {
       await sendEmail({

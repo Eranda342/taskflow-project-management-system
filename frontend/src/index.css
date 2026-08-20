@@ -57,3 +57,24 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* Scroll Animations */
+.scroll-animate {
+  opacity: 0;
+  transform: translateY(30px) scale(0.98);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.scroll-animate.scroll-in-view {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Add slight stagger delays to grid items if they are animated together */
+.grid > .scroll-animate:nth-child(1) { transition-delay: 0.05s; }
+.grid > .scroll-animate:nth-child(2) { transition-delay: 0.1s; }
+.grid > .scroll-animate:nth-child(3) { transition-delay: 0.15s; }
+.grid > .scroll-animate:nth-child(4) { transition-delay: 0.2s; }
+.grid > .scroll-animate:nth-child(5) { transition-delay: 0.25s; }
+.grid > .scroll-animate:nth-child(6) { transition-delay: 0.3s; }
