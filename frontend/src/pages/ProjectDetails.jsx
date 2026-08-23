@@ -638,7 +638,7 @@ export function ProjectDetails() {
       />
 
       {/* Edit Project Modal */}
-      <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Project">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Project">
         <form onSubmit={handleEditProject} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Project Name <span className="text-red-500">*</span></label>
