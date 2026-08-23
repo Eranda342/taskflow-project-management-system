@@ -16,6 +16,7 @@ import { Modal, ConfirmDialog } from "../components/Modal";
 import CreateTaskModal from "../components/CreateTaskModal";
 import { useApp } from "../context/AppContext";
 import api from "../lib/api";
+import { getSocket } from "../lib/socket";
 
 function formatDate(dateString) {
   if (!dateString) return "No date";
@@ -82,6 +83,39 @@ export function ProjectDetails() {
   useEffect(() => {
     fetchProjectData();
   }, [fetchProjectData]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !id) return;
+
+    const handleTaskCreated = (data) => {
+      if (data.task && data.task.project === id) {
+        setTasks((prev) => [data.task, ...prev]);
+      }
+    };
+
+    const handleTaskUpdated = (data) => {
+      if (data.task && data.task.project === id) {
+        setTasks((prev) => prev.map(t => t._id === data.task._id ? data.task : t));
+      }
+    };
+
+    const handleTaskDeleted = (data) => {
+      if (data.projectId === id) {
+        setTasks((prev) => prev.filter(t => t._id !== data.taskId));
+      }
+    };
+
+    socket.on("task:created", handleTaskCreated);
+    socket.on("task:updated", handleTaskUpdated);
+    socket.on("task:deleted", handleTaskDeleted);
+
+    return () => {
+      socket.off("task:created", handleTaskCreated);
+      socket.off("task:updated", handleTaskUpdated);
+      socket.off("task:deleted", handleTaskDeleted);
+    };
+  }, [id, setTasks]);
 
   const handleDeleteProject = async () => {
     try {
@@ -189,7 +223,7 @@ export function ProjectDetails() {
   const progress = tasksTotal === 0 ? 0 : Math.round((tasksCompleted / tasksTotal) * 100);
 
   const canManageMembers = currentUser.role === "admin" || currentUser.role === "project_manager";
-  const canManageProject = currentUser.role === "admin" || (currentUser.role === "project_manager" && owner?._id === currentUser._id);
+  const canManageProject = currentUser.role === "admin" || (currentUser.role === "project_manager" && (owner?._id === currentUser.id || owner?._id === currentUser._id));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
