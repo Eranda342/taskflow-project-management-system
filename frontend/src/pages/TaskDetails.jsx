@@ -87,16 +87,54 @@ export function TaskDetails() {
     const socket = getSocket();
     if (!socket || !task?._id) return;
 
+    const projectId = typeof task.project === 'object' ? task.project._id : task.project;
+    if (projectId) {
+      console.log("[TaskDetails] Emitting project:join for projectId:", projectId);
+      socket.emit("project:join", { projectId });
+    }
+
     const handleTaskUpdated = (data) => {
       if (data.task && data.task._id === task._id) {
         setTask(data.task);
       }
     };
     
+    const handleCommentNew = (data) => {
+      console.log("[TaskDetails] RECEIVED comment:new event:", data);
+      if (data.taskId === task._id && data.comment) {
+        setComments(prev => {
+          // Avoid duplicates
+          if (prev.some(c => c._id === data.comment._id)) return prev;
+          return [...prev, data.comment];
+        });
+      }
+    };
+
+    const handleCommentUpdated = (data) => {
+      if (data.taskId === task._id && data.comment) {
+        setComments(prev => prev.map(c => c._id === data.comment._id ? data.comment : c));
+      }
+    };
+
+    const handleCommentDeleted = (data) => {
+      if (data.taskId === task._id && data.commentId) {
+        setComments(prev => prev.filter(c => c._id !== data.commentId));
+      }
+    };
+    
     socket.on("task:updated", handleTaskUpdated);
+    socket.on("comment:new", handleCommentNew);
+    socket.on("comment:updated", handleCommentUpdated);
+    socket.on("comment:deleted", handleCommentDeleted);
     
     return () => {
+      if (projectId) {
+        socket.emit("project:leave", { projectId });
+      }
       socket.off("task:updated", handleTaskUpdated);
+      socket.off("comment:new", handleCommentNew);
+      socket.off("comment:updated", handleCommentUpdated);
+      socket.off("comment:deleted", handleCommentDeleted);
     };
   }, [task?._id]);
 
@@ -194,7 +232,10 @@ export function TaskDetails() {
     setSubmitting(true);
     try {
       const { data } = await api.post(`/tasks/${task._id}/comments`, { message: newComment });
-      setComments((prev) => [...prev, data.data.comment]);
+      setComments((prev) => {
+        if (prev.some(c => c._id === data.data.comment._id)) return prev;
+        return [...prev, data.data.comment];
+      });
       setNewComment("");
       addToast("success", "Comment added");
     } catch (err) {

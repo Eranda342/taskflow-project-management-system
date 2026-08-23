@@ -88,14 +88,18 @@ export function ProjectDetails() {
     const socket = getSocket();
     if (!socket || !id) return;
 
+    socket.emit("project:join", { projectId: id });
+
     const handleTaskCreated = (data) => {
-      if (data.task && data.task.project === id) {
+      const taskProjectId = data.task?.project?._id || data.task?.project;
+      if (data.task && taskProjectId === id) {
         setTasks((prev) => [data.task, ...prev]);
       }
     };
 
     const handleTaskUpdated = (data) => {
-      if (data.task && data.task.project === id) {
+      const taskProjectId = data.task?.project?._id || data.task?.project;
+      if (data.task && taskProjectId === id) {
         setTasks((prev) => prev.map(t => t._id === data.task._id ? data.task : t));
       }
     };
@@ -111,6 +115,7 @@ export function ProjectDetails() {
     socket.on("task:deleted", handleTaskDeleted);
 
     return () => {
+      socket.emit("project:leave", { projectId: id });
       socket.off("task:created", handleTaskCreated);
       socket.off("task:updated", handleTaskUpdated);
       socket.off("task:deleted", handleTaskDeleted);
