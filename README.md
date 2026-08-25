@@ -162,3 +162,4 @@ This generates an optimized static bundle in the `frontend/dist` directory. Ensu
 ### CI/CD Pipeline
 
 TaskFlow includes GitHub Actions workflows for continuous integration. Every push and pull request to the `main` branch automatically runs formatting checks, linting, and the complete backend test suite to prevent regressions.
+
